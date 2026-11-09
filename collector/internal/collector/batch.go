@@ -21,12 +21,22 @@ type BatchRunner struct {
 	Fetcher        *SafeFetcher
 	WorkDir        string
 	FingerprintKey []byte
+	FastDeadline   time.Duration
+	TCPConcurrency int
 }
 
 func (runner BatchRunner) Run(ctx context.Context) error {
 	if len(runner.FingerprintKey) < 32 {
 		return errors.New("fingerprint key must contain at least 32 bytes")
 	}
+	if runner.FastDeadline <= 0 {
+		runner.FastDeadline = 30 * time.Second
+	}
+	if runner.TCPConcurrency <= 0 {
+		runner.TCPConcurrency = 2
+	}
+	ctx, cancel := context.WithTimeout(ctx, runner.FastDeadline)
+	defer cancel()
 	sources, err := runner.Store.EnabledSources(ctx)
 	if err != nil {
 		return err
@@ -34,6 +44,9 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 	var accepted []string
 	seen := map[string]struct{}{}
 	for _, source := range sources {
+		if ctx.Err() != nil {
+			break
+		}
 		candidates, fetchErr := runner.fetchAndScreen(ctx, source)
 		if fetchErr != nil {
 			_, _ = runner.Store.RecordRun(ctx, source.ID, RunFailed, 0, "fetch_or_screen_failed")
@@ -66,20 +79,61 @@ func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source) ([]
 	if err != nil {
 		return nil, err
 	}
-	accepted := make([]string, 0, len(candidates))
-	for _, candidate := range candidates {
-		endpoint, err := candidateEndpoint(candidate)
-		if err != nil {
-			continue
-		}
-		if err := tcpReachable(ctx, runner.Fetcher.Resolver, endpoint); err == nil {
-			accepted = append(accepted, candidate)
-		}
-	}
+	accepted := runner.screenCandidates(ctx, candidates)
 	if len(accepted) == 0 {
 		return nil, errors.New("no candidates passed bounded TCP screening")
 	}
 	return accepted, nil
+}
+
+func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string) []string {
+	limit := len(candidates)
+	if limit > 50 {
+		limit = 50
+	}
+	candidates = candidates[:limit]
+	accepted := make(chan string, limit)
+	jobs := make(chan string)
+	for range runner.TCPConcurrency {
+		go func() {
+			for candidate := range jobs {
+				endpoint, err := candidateEndpoint(candidate)
+				if err == nil {
+					probeContext, cancel := context.WithTimeout(ctx, 3*time.Second)
+					err = tcpReachable(probeContext, runner.Fetcher.Resolver, endpoint)
+					cancel()
+					if err == nil {
+						select {
+						case accepted <- candidate:
+						case <-ctx.Done():
+						}
+					}
+				}
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for _, candidate := range candidates {
+			select {
+			case jobs <- candidate:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	result := make([]string, 0, limit)
+	for range candidates {
+		select {
+		case candidate := <-accepted:
+			result = append(result, candidate)
+		case <-ctx.Done():
+			return result
+		case <-time.After(3 * time.Second):
+			return result
+		}
+	}
+	return result
 }
 
 func candidateEndpoint(candidate string) (string, error) {
