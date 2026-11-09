@@ -20,6 +20,10 @@ import (
 
 const defaultProbeURL = "https://cp.cloudflare.com/generate_204"
 
+type probeFailure struct{ category string }
+
+func (failure probeFailure) Error() string { return failure.category }
+
 type CandidateProber interface {
 	Probe(ctx context.Context, candidate string) error
 }
@@ -103,14 +107,14 @@ func (prober SingBoxProber) Probe(ctx context.Context, candidate string) error {
 				if response.StatusCode == http.StatusNoContent {
 					return nil
 				}
-				return fmt.Errorf("probe endpoint returned status %d", response.StatusCode)
+				return probeFailure{category: "http_status"}
 			}
 		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-deadline.C:
-			return errors.New("sing-box probe did not become ready")
+			return probeFailure{category: "proxy_http_failed"}
 		case <-time.After(50 * time.Millisecond):
 		}
 	}
@@ -151,20 +155,38 @@ func (prober SingBoxProber) config(ctx context.Context, candidate string) (singB
 		return singBoxConfig{}, err
 	}
 	transport := parsed.Query().Get("type")
-	if transport != "" && transport != "tcp" {
+	if transport != "" && transport != "tcp" && transport != "ws" && transport != "grpc" {
 		return singBoxConfig{}, errors.New("candidate transport is not supported by bounded probe")
 	}
 	outbound := map[string]any{"tag": "probe-out", "server": endpoint, "server_port": mustPort(parsed.Port())}
 	switch parsed.Scheme {
 	case "vless":
 		security := parsed.Query().Get("security")
-		if security != "" && security != "none" && security != "tls" {
+		if security != "" && security != "none" && security != "tls" && security != "reality" {
 			return singBoxConfig{}, errors.New("candidate security mode is not supported by bounded probe")
 		}
 		outbound["type"] = "vless"
 		outbound["uuid"] = parsed.User.Username()
 		if security == "tls" {
 			outbound["tls"] = map[string]any{"enabled": true, "server_name": serverName(parsed)}
+		} else if security == "reality" {
+			publicKey := parsed.Query().Get("pbk")
+			if publicKey == "" {
+				return singBoxConfig{}, errors.New("reality candidate lacks public key")
+			}
+			tls := map[string]any{"enabled": true, "server_name": serverName(parsed), "reality": map[string]any{"enabled": true, "public_key": publicKey}}
+			if shortID := parsed.Query().Get("sid"); shortID != "" {
+				tls["reality"].(map[string]any)["short_id"] = shortID
+			}
+			if fingerprint := parsed.Query().Get("fp"); fingerprint != "" {
+				tls["utls"] = map[string]any{"enabled": true, "fingerprint": fingerprint}
+			}
+			outbound["tls"] = tls
+		}
+		if transport == "ws" {
+			outbound["transport"] = map[string]any{"type": "ws", "path": parsed.Query().Get("path"), "headers": map[string]string{"Host": serverName(parsed)}}
+		} else if transport == "grpc" {
+			outbound["transport"] = map[string]any{"type": "grpc", "service_name": parsed.Query().Get("serviceName")}
 		}
 	case "trojan":
 		outbound["type"] = "trojan"
@@ -190,13 +212,13 @@ func supportsBoundedProbe(candidate string) bool {
 		return false
 	}
 	transport := parsed.Query().Get("type")
-	if transport != "" && transport != "tcp" {
+	if transport != "" && transport != "tcp" && transport != "ws" && transport != "grpc" {
 		return false
 	}
 	switch parsed.Scheme {
 	case "vless":
 		security := parsed.Query().Get("security")
-		return security == "" || security == "none" || security == "tls"
+		return security == "" || security == "none" || security == "tls" || (security == "reality" && parsed.Query().Get("pbk") != "")
 	case "trojan", "ss":
 		return true
 	default:

@@ -31,16 +31,48 @@ func TestSingBoxConfigUsesResolvedPublicAddressAndTLSName(t *testing.T) {
 	}
 }
 
-func TestSingBoxConfigRejectsUnsupportedTransport(t *testing.T) {
+func TestSingBoxConfigRejectsUnknownTransport(t *testing.T) {
 	candidate := (&url.URL{
 		Scheme:   "trojan",
 		User:     url.User("test-credential"),
 		Host:     "node.example:443",
-		RawQuery: url.Values{"type": []string{"ws"}}.Encode(),
+		RawQuery: url.Values{"type": []string{"quic"}}.Encode(),
 	}).String()
 	prober := SingBoxProber{Resolver: staticResolver{addresses: []netip.Addr{netip.MustParseAddr("8.8.8.8")}}}
 	if _, err := prober.config(context.Background(), candidate); err == nil {
 		t.Fatal("unsupported transport was accepted")
+	}
+}
+
+func TestSingBoxConfigSupportsVlessWebSocketAndReality(t *testing.T) {
+	candidate := (&url.URL{
+		Scheme: "vless", User: url.User("test-credential"), Host: "node.example:443",
+		RawQuery: url.Values{"type": []string{"ws"}, "path": []string{"/edge"}, "security": []string{"reality"}, "pbk": []string{"public-key"}, "sid": []string{"abcd"}, "fp": []string{"chrome"}}.Encode(),
+	}).String()
+	prober := SingBoxProber{Resolver: staticResolver{addresses: []netip.Addr{netip.MustParseAddr("8.8.8.8")}}}
+	config, err := prober.config(context.Background(), candidate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outbound := config.Outbounds[0]
+	if outbound["transport"].(map[string]any)["type"] != "ws" {
+		t.Fatalf("missing ws transport: %#v", outbound)
+	}
+	tls := outbound["tls"].(map[string]any)
+	if tls["reality"].(map[string]any)["public_key"] != "public-key" {
+		t.Fatalf("missing reality settings: %#v", tls)
+	}
+}
+
+func TestSingBoxConfigSupportsVlessGRPC(t *testing.T) {
+	candidate := (&url.URL{Scheme: "vless", User: url.User("test-credential"), Host: "node.example:443", RawQuery: url.Values{"type": []string{"grpc"}, "serviceName": []string{"edge"}}.Encode()}).String()
+	prober := SingBoxProber{Resolver: staticResolver{addresses: []netip.Addr{netip.MustParseAddr("8.8.8.8")}}}
+	config, err := prober.config(context.Background(), candidate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Outbounds[0]["transport"].(map[string]any)["type"] != "grpc" {
+		t.Fatalf("missing grpc transport: %#v", config.Outbounds[0])
 	}
 }
 

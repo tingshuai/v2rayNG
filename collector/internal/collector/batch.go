@@ -111,15 +111,15 @@ func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source) ([]
 	if runner.Prober != nil {
 		screened = selectProbeCandidates(candidates)
 	}
-	accepted := runner.screenCandidates(ctx, candidates)
-	slog.Info("candidate screening summary", "component", "batch", "source_id", source.ID, "received_count", len(candidates), "eligible_count", len(screened), "accepted_count", len(accepted))
+	accepted, failures := runner.screenCandidates(ctx, candidates)
+	slog.Info("candidate screening summary", "component", "batch", "source_id", source.ID, "received_count", len(candidates), "eligible_count", len(screened), "unsupported_count", len(candidates)-len(screened), "accepted_count", len(accepted), "tcp_failed_count", failures["tcp_failed"], "proxy_http_failed_count", failures["proxy_http_failed"], "http_status_count", failures["http_status"], "invalid_count", failures["invalid"])
 	if len(accepted) == 0 {
 		return nil, errors.New("no candidates passed bounded TCP screening")
 	}
 	return accepted, nil
 }
 
-func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string) []string {
+func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string) ([]string, map[string]int) {
 	if runner.Prober != nil {
 		candidates = selectProbeCandidates(candidates)
 	} else if len(candidates) > maxScreenedCandidates {
@@ -127,6 +127,7 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 	}
 	limit := len(candidates)
 	accepted := make(chan string, limit)
+	failures := make(chan string, limit)
 	jobs := make(chan string)
 	var workers sync.WaitGroup
 	for range runner.TCPConcurrency {
@@ -135,18 +136,26 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 			defer workers.Done()
 			for candidate := range jobs {
 				endpoint, err := candidateEndpoint(candidate)
-				if err == nil {
+				if err != nil {
+					failures <- "invalid"
+					continue
+				}
+				{
 					probeContext, cancel := context.WithTimeout(ctx, 3*time.Second)
 					err = tcpReachable(probeContext, runner.Fetcher.Resolver, endpoint)
-					cancel()
 					if err == nil && runner.Prober != nil {
 						err = runner.Prober.Probe(probeContext, candidate)
 					}
+					cancel()
 					if err == nil {
 						select {
 						case accepted <- candidate:
 						case <-ctx.Done():
 						}
+					} else if failure, ok := err.(probeFailure); ok {
+						failures <- failure.category
+					} else {
+						failures <- "tcp_failed"
 					}
 				}
 			}
@@ -155,6 +164,7 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 	go func() {
 		workers.Wait()
 		close(accepted)
+		close(failures)
 	}()
 	go func() {
 		defer close(jobs)
@@ -167,17 +177,26 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 		}
 	}()
 	result := make([]string, 0, limit)
-	for {
+	counts := map[string]int{}
+	for accepted != nil || failures != nil {
 		select {
 		case candidate, open := <-accepted:
 			if !open {
-				return result
+				accepted = nil
+			} else {
+				result = append(result, candidate)
 			}
-			result = append(result, candidate)
+		case category, open := <-failures:
+			if !open {
+				failures = nil
+			} else {
+				counts[category]++
+			}
 		case <-ctx.Done():
-			return result
+			return result, counts
 		}
 	}
+	return result, counts
 }
 
 func selectProbeCandidates(candidates []string) []string {
