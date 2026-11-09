@@ -5,6 +5,10 @@
 ## 文档导航
 
 - [实施路径](implementation-plan.md)：用通俗语言说明端到端流程与分期交付。
+- [开发节奏与验收](development-roadmap.md)：阶段、依赖、交付物和完成标准。
+- [部署与技术栈](deployment-architecture.md)：首版基础设施、组件边界和扩容条件。
+- [P0 设计冻结](p0-design-freeze.md)：已确认的来源、保留期、迁移草案和测试夹具契约。
+- [P0 测试夹具](fixtures/README.md)：不含节点配置或秘密的确定性输入与预期结果。
 - [订阅与元数据契约](feed-schema.md)：服务端对客户端的稳定输出约定。
 - [采集服务运行手册](collector-runbook.md)：独立采集服务的边界、检查及应急处理。
 - [数据保留与威胁模型](threat-model.md)：风险、隐私和日志规则。

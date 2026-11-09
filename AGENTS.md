@@ -201,10 +201,14 @@ behavior for every user who does not opt in.
 - Before an upstream-sync or feature branch, run `git fetch upstream master`, compare the branch
   with `upstream/master`, and update the canonical instruction files as required by this guide.
   Keep this local block intact during upstream synchronization.
-- Keep the collector and screening service operationally separate from the Android client. This
-  repository owns the Android integration, feed contract, documentation, and test fixtures; it
-  must not contain VPS credentials, production URLs with secrets, source-account cookies, or live
-  node configuration dumps.
+- Keep the collector and screening service operationally and by directory separate from the Android
+  client. `V2rayNG/` owns Android integration; `collector/` is an independent Go module that owns
+  source registration, bounded screening, and standard-subscription publication. They share only
+  the versioned contract and de-identified fixtures under `docs/free-node/` and, when needed,
+  `fixtures/free-node/`. Each must build, test, deploy, roll back, and run CI independently; Android
+  CI must not require Go, and collector CI must not require Gradle. The repository must not contain
+  VPS credentials, production URLs with secrets, source-account cookies, live node configuration
+  dumps, databases, or runtime output.
 
 ## Free-node product boundary
 

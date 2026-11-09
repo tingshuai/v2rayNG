@@ -2,6 +2,13 @@
 *.dat
 *.jks
 
+# Collector runtime state and deployment secrets
+/collector/data/
+/collector/.env
+/collector/*.db
+/collector/*.sqlite
+/collector/*.sqlite3
+
 # Ignore output JSON file
 V2rayNG/app/release/output.json
 

@@ -1,0 +1,21 @@
+services:
+  collector:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    read_only: true
+    user: "65532:65532"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    volumes:
+      - collector-data:/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  collector-data:
