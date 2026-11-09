@@ -4,7 +4,7 @@
 
 首版采集服务的目标部署位置是 Hostinger 马来西亚 KVM1；拟使用的公开订阅主机名为 `freenode.go2base.com`，域名由 Cloudflare 托管。该 VPS 只运行采集、初筛、订阅发布和必要监控，不承载用户代理流量，也不作为任何候选节点的中转。
 
-截至 2026-11-09，公共 DNS 查询尚未为该主机名返回记录，且目标主机尚未运行本仓库的 Go collector 部署单元。因此该主机名不得视为已发布订阅。部署负责人必须先在目标主机安装本目录的 Compose 与 systemd 单元、配置部署机密钥，并在 Cloudflare 创建 Tunnel hostname 路由；随后从外部确认 `/healthz` 与 `/subscription` 均返回成功，才可将其交给 Android P2 的真实接入测试。
+截至 2026-11-09 的外部复核，`freenode.go2base.com` 已有 Cloudflare 代理的 A/AAAA 记录；`https://freenode.go2base.com/healthz` 返回 204，`/subscription` 返回 200，且响应可解码为标准订阅记录。因此该端点可用于 Android P2 的真实接入测试。该可达性检查不替代部署负责人对目标主机 Compose、systemd、部署密钥权限和 Cloudflare Tunnel 路由的持续核验；上述运行配置仍须按本目录的部署文件维护，且不得写入仓库。
 
 服务实现位于仓库根目录的 `collector/`，是独立 Go 模块；Android 客户端仅位于 `V2rayNG/`。两者可在同一 Git 仓库演进，但不得共享进程、数据库、内部 API、构建链路或发布回滚流程。客户端只消费本文档定义的版本化标准订阅；collector 的数据库和管理入口均为服务端内部实现。
 
