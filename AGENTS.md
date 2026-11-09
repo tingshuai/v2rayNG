@@ -186,3 +186,78 @@ whitespace outside touched declarations or reorder imports except as the diff re
   issue requires it. Keep a stable path for supported non-preview devices, gate by runtime API or
   feature availability, and test both paths. After an API guard, opt-in, or lint suppression, run
   `:app:lintPlaystoreDebug` and also `:app:lintFdroidDebug` when behavior differs by distribution.
+
+<!-- LOCAL INSTRUCTIONS - START: FreeV2ray maintenance -->
+
+## FreeV2ray maintenance scope
+
+This fork adds an opt-in free-node capability to v2rayNG. Its goal is to provide a maintained
+candidate feed and make choices using the user's real network. Preserve v2rayNG's existing client
+behavior for every user who does not opt in.
+
+- `origin` is `https://github.com/tingshuai/v2rayNG.git`; `upstream` is
+  `https://github.com/2dust/v2rayNG.git`. `upstream/master` is the core baseline. Do not replace,
+  rebase, or force-push `master`; use focused `codex/` branches and explicit merges or PRs.
+- Before an upstream-sync or feature branch, run `git fetch upstream master`, compare the branch
+  with `upstream/master`, and update the canonical instruction files as required by this guide.
+  Keep this local block intact during upstream synchronization.
+- Keep the collector and screening service operationally separate from the Android client. This
+  repository owns the Android integration, feed contract, documentation, and test fixtures; it
+  must not contain VPS credentials, production URLs with secrets, source-account cookies, or live
+  node configuration dumps.
+
+## Free-node product boundary
+
+- The VPS gathers only explicitly configured, publicly available sources, normalizes and deduplicates
+  them, then performs bounded initial checks. Its results are candidate signals, not a claim that a
+  node works for a user.
+- The client is authoritative for real connectivity, latency, stability, and selection. Reuse the
+  existing subscription updater, real-ping service, and Xray policy-group/balancer mechanisms before
+  adding a parallel scheduler or switching implementation.
+- Do not change the selected server repeatedly after one measurement. Automatic mode should prefer
+  a dedicated free-node policy group and Xray's runtime balancing/observability; use hysteresis and
+  repeated failures before failing over.
+- Background work must honor Android/WorkManager limits, battery and network constraints. Test a
+  bounded, ranked candidate set plus small exploration samples; never schedule unrestricted full-pool
+  probing on mobile data.
+
+## Data, privacy, and safety requirements
+
+- Treat every free node as untrusted. UI and documentation must warn users not to send credentials,
+  payments, or other sensitive traffic through the service.
+- The collector must reject loopback, private, link-local, and other non-public targets after DNS
+  resolution, defend against DNS rebinding, apply per-source rate limits and short timeouts, and
+  never act as a general port scanner.
+- Never log or upload full proxy URLs, credentials, UUIDs, private keys, client IP addresses, or
+  browsing/test payloads. Keep client metrics local by default.
+- A server GUID is not stable across subscription replacement. Persist free-node history by a
+  canonical, secret-safe fingerprint of connection-relevant fields, not by list position or GUID.
+  Use the project's MMKV managers and backward-compatible migrations for persisted data.
+
+## Feed contract and scoring
+
+- The MVP feed remains a standard V2Ray-compatible subscription so it can pass through the existing
+  parser. Any companion metadata endpoint must be versioned, authenticated only when necessary, and
+  optional for ordinary subscription import.
+- VPS checks may include syntax validation, public-address validation, TCP/TLS reachability, and a
+  small proxied HTTP `204` request. Limit concurrency and retries; do not run bandwidth-heavy tests.
+- Local ranking prioritizes recent successful real probes, success rate, and stability before EWMA
+  latency and jitter. VPS scores are only a weak bootstrap signal. Isolate repeated failures with a
+  TTL and require a meaningful, repeated advantage before replacing a healthy incumbent.
+
+## Documentation and delivery
+
+- Documentation maintenance is a standing responsibility: proactively keep `docs/free-node/`
+  accurate, structured, and indexed whenever a free-node decision, contract, implementation, or
+  operational procedure changes. Do not wait for a separate reminder; preserve decision history
+  and remove or mark superseded guidance as part of the same task.
+- When implementation starts, maintain `docs/free-node/` with: the feed schema, deployment/runbook,
+  data-retention and threat model, Android state/selection design, and an upstream-sync checklist.
+  Keep operational details free of credentials and live node lists.
+- Add unit tests for deterministic parsing, fingerprinting, score/hysteresis decisions, persistence
+  migration, and failure isolation. For VPN/core/background lifecycle changes, also perform the
+  device or emulator validation required above.
+- Every implementation PR must state: the source of truth for each decision, which existing v2rayNG
+  facility it extends, data retained on device/VPS, and the exact unrun checks if any.
+
+<!-- LOCAL INSTRUCTIONS - END: FreeV2ray maintenance -->
