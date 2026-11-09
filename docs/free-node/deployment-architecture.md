@@ -2,7 +2,9 @@
 
 ## 当前部署决定
 
-首版采集服务部署在 Hostinger 马来西亚 KVM1；公开订阅主机名为 `freenode.go2base.com`，域名由 Cloudflare 托管。该 VPS 只运行采集、初筛、订阅发布和必要监控，不承载用户代理流量，也不作为任何候选节点的中转。
+首版采集服务的目标部署位置是 Hostinger 马来西亚 KVM1；拟使用的公开订阅主机名为 `freenode.go2base.com`，域名由 Cloudflare 托管。该 VPS 只运行采集、初筛、订阅发布和必要监控，不承载用户代理流量，也不作为任何候选节点的中转。
+
+截至 2026-11-09，公共 DNS 查询尚未为该主机名返回记录，且目标主机尚未运行本仓库的 Go collector 部署单元。因此该主机名不得视为已发布订阅。部署负责人必须先在目标主机安装本目录的 Compose 与 systemd 单元、配置部署机密钥，并在 Cloudflare 创建 Tunnel hostname 路由；随后从外部确认 `/healthz` 与 `/subscription` 均返回成功，才可将其交给 Android P2 的真实接入测试。
 
 服务实现位于仓库根目录的 `collector/`，是独立 Go 模块；Android 客户端仅位于 `V2rayNG/`。两者可在同一 Git 仓库演进，但不得共享进程、数据库、内部 API、构建链路或发布回滚流程。客户端只消费本文档定义的版本化标准订阅；collector 的数据库和管理入口均为服务端内部实现。
 
@@ -35,7 +37,7 @@ cloudflared ──> collector API / 静态订阅（仅 127.0.0.1）
                          └── 受限 sing-box 探测子进程
 ```
 
-订阅端点是公开只读的；管理接口不对公网暴露。来源增删、暂停和恢复第一阶段通过 SSH 下的受审计管理命令完成；管理 UI 或 API 是后续需求，不属于 MVP。
+订阅端点是公开只读的；管理接口不对公网暴露。来源增删、暂停和恢复第一阶段通过 SSH 下的受审计管理命令完成；管理 UI 或 API 是后续需求，不属于 MVP。批次调度使用 `collector/deploy/systemd/collector-run.timer`；发布新鲜度使用对应 health-check timer 与告警钩子检查，不能依赖常驻 HTTP 容器本身仍在运行来判断服务健康。
 
 ## 运行限制与默认预算
 

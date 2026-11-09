@@ -127,18 +127,24 @@ func serve(arguments []string) {
 	migrations := flags.String("migrations", "./migrations", "migration directory")
 	listen := flags.String("listen", "127.0.0.1:8080", "loopback listen address")
 	workDir := flags.String("work-dir", "./data", "runtime work directory")
+	maxPublishAge := flags.Duration("max-publish-age", 2*time.Hour, "maximum age of a published subscription accepted by /healthz")
 	flags.Parse(arguments)
 	store := openAndMigrate(*database, *migrations)
 	defer store.Close()
-	server := &http.Server{Addr: *listen, Handler: newServeMux(*workDir), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	server := &http.Server{Addr: *listen, Handler: newServeMux(*workDir, *maxPublishAge), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
 	slog.Info("collector listening", "address", *listen)
 	fail(server.ListenAndServe())
 }
 
-func newServeMux(workDir string) *http.ServeMux {
+func newServeMux(workDir string, maxPublishAge time.Duration) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Cache-Control", "no-store")
+		info, err := os.Stat(filepath.Join(workDir, "published", "subscription.txt"))
+		if err != nil || time.Since(info.ModTime()) > maxPublishAge {
+			http.Error(writer, "subscription is missing or stale", http.StatusServiceUnavailable)
+			return
+		}
 		writer.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /subscription", func(writer http.ResponseWriter, request *http.Request) {

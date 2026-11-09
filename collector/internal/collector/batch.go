@@ -66,6 +66,9 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 	if err := removeExpiredBackup(runner.WorkDir, time.Now()); err != nil {
 		return fmt.Errorf("remove expired subscription backup: %w", err)
 	}
+	if err := cleanupProbeArtifacts(runner.WorkDir); err != nil {
+		return fmt.Errorf("clean stale probe artifacts: %w", err)
+	}
 	if err := runner.Store.PruneExpired(screeningCtx, time.Now()); err != nil {
 		return fmt.Errorf("prune expired collector records: %w", err)
 	}
@@ -80,6 +83,7 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 		}
 	}
 	var accepted []string
+	var acceptedFingerprints []string
 	seen := map[string]struct{}{}
 	deferredSources := 0
 	for result := range runner.screenSources(screeningCtx, due) {
@@ -98,6 +102,7 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 			if _, exists := seen[fingerprint]; !exists {
 				seen[fingerprint] = struct{}{}
 				accepted = append(accepted, candidate)
+				acceptedFingerprints = append(acceptedFingerprints, fingerprint)
 			}
 		}
 	}
@@ -110,8 +115,15 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 	if err := finalizationCtx.Err(); err != nil {
 		return fmt.Errorf("finalize batch: %w", err)
 	}
-	if err := publishAtomically(runner.WorkDir, accepted); err != nil {
+	publication, err := publishAtomically(runner.WorkDir, accepted)
+	if err != nil {
 		return err
+	}
+	if err := runner.Store.RecordPublication(finalizationCtx, acceptedFingerprints, publication.snapshot); err != nil {
+		if rollbackErr := publication.rollback(); rollbackErr != nil {
+			return fmt.Errorf("record publication: %w; rollback published output: %v", err, rollbackErr)
+		}
+		return fmt.Errorf("record publication: %w", err)
 	}
 	slog.Info("collector batch published", "component", "batch", "enabled_source_count", len(sources), "due_source_count", len(due), "deferred_source_count", deferredSources, "published_candidate_count", len(accepted), "screening_deadline_exceeded", screeningCtx.Err() != nil)
 	return nil
@@ -349,45 +361,72 @@ func fingerprint(key []byte, candidate string) string {
 	return fmt.Sprintf("%x", mac.Sum(nil))
 }
 
-func publishAtomically(workDir string, candidates []string) error {
-	directory := filepath.Join(workDir, "published")
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+type publication struct {
+	active      string
+	backup      string
+	hadPrevious bool
+	snapshot    PublishedSnapshot
+}
+
+func (publication publication) rollback() error {
+	if err := os.Remove(publication.active); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	contents := []byte(base64.StdEncoding.EncodeToString([]byte(strings.Join(candidates, "\n"))))
+	if publication.hadPrevious {
+		return os.Rename(publication.backup, publication.active)
+	}
+	return nil
+}
+
+func publishAtomically(workDir string, candidates []string) (publication, error) {
+	directory := filepath.Join(workDir, "published")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		return publication{}, err
+	}
+	decoded := []byte(strings.Join(candidates, "\n"))
+	contents := []byte(base64.StdEncoding.EncodeToString(decoded))
 	temporary, err := os.CreateTemp(directory, ".subscription-*")
 	if err != nil {
-		return err
+		return publication{}, err
 	}
 	temporaryName := temporary.Name()
 	defer os.Remove(temporaryName)
 	if err := temporary.Chmod(0o600); err != nil {
 		temporary.Close()
-		return err
+		return publication{}, err
 	}
 	if _, err := temporary.Write(contents); err != nil {
 		temporary.Close()
-		return err
+		return publication{}, err
 	}
 	if err := temporary.Sync(); err != nil {
 		temporary.Close()
-		return err
+		return publication{}, err
 	}
 	if err := temporary.Close(); err != nil {
-		return err
+		return publication{}, err
 	}
 	active := filepath.Join(directory, "subscription.txt")
 	backup := filepath.Join(directory, "subscription.previous.txt")
+	published := publication{active: active, backup: backup, snapshot: PublishedSnapshot{ContentSHA256: fmt.Sprintf("%x", sha256.Sum256(decoded)), ActivePath: filepath.Join("published", "subscription.txt"), PublishedAt: time.Now().UTC()}}
 	if _, err := os.Stat(active); err == nil {
 		_ = os.Remove(backup)
 		if err := os.Rename(active, backup); err != nil {
-			return err
+			return publication{}, err
 		}
+		published.hadPrevious = true
+		published.snapshot.BackupPath = filepath.Join("published", "subscription.previous.txt")
 		if err := os.Chtimes(backup, time.Now(), time.Now()); err != nil {
-			return err
+			return publication{}, err
 		}
 	}
-	return os.Rename(temporaryName, active)
+	if err := os.Rename(temporaryName, active); err != nil {
+		if published.hadPrevious {
+			_ = os.Rename(backup, active)
+		}
+		return publication{}, err
+	}
+	return published, nil
 }
 
 func removeExpiredBackup(workDir string, now time.Time) error {

@@ -1,0 +1,8 @@
+[Unit]
+Description=FreeV2ray collector alert hook for %i
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/freev2ray/collector-alert.env
+ExecStart=/bin/sh -c 'test -n "$COLLECTOR_ALERT_COMMAND" && exec sh -c "$COLLECTOR_ALERT_COMMAND" || logger -t freev2ray-collector-alert "collector health check failed: $1"' -- %i
+NoNewPrivileges=true

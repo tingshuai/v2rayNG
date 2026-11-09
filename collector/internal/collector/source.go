@@ -69,8 +69,16 @@ type Store interface {
 	EnableSource(ctx context.Context, sourceID, reason string) error
 	DeleteSource(ctx context.Context, sourceID, reason string) error
 	RecordRun(ctx context.Context, sourceID string, outcome RunOutcome, candidateCount int, errorCode string) (Source, error)
+	RecordPublication(ctx context.Context, fingerprints []string, snapshot PublishedSnapshot) error
 	EnabledSources(ctx context.Context) ([]Source, error)
 	PruneExpired(ctx context.Context, now time.Time) error
+}
+
+type PublishedSnapshot struct {
+	ContentSHA256 string
+	ActivePath    string
+	BackupPath    string
+	PublishedAt   time.Time
 }
 
 type RunOutcome string

@@ -254,6 +254,28 @@ func (store *SQLiteStore) RecordRun(ctx context.Context, sourceID string, outcom
 	return store.source(ctx, sourceID)
 }
 
+func (store *SQLiteStore) RecordPublication(ctx context.Context, fingerprints []string, snapshot PublishedSnapshot) error {
+	if snapshot.ContentSHA256 == "" || snapshot.ActivePath == "" || snapshot.PublishedAt.IsZero() {
+		return errors.New("published snapshot is incomplete")
+	}
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	publishedAt := snapshot.PublishedAt.UTC().Format(time.RFC3339Nano)
+	for _, value := range fingerprints {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_fingerprints(fingerprint, first_seen_at, last_seen_at, success_count, failure_count) VALUES(?, ?, ?, 1, 0) ON CONFLICT(fingerprint) DO UPDATE SET last_seen_at=excluded.last_seen_at, success_count=candidate_fingerprints.success_count + 1`, value, publishedAt, publishedAt); err != nil {
+			return err
+		}
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO published_snapshots(content_sha256, active_path, backup_path, published_at) VALUES(?, ?, ?, ?)`, snapshot.ContentSHA256, snapshot.ActivePath, nullableString(snapshot.BackupPath), publishedAt)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func nullableString(value string) any {
 	if value == "" {
 		return nil

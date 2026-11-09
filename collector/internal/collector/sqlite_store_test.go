@@ -73,6 +73,37 @@ func TestScreenedOutAndDeferredRunsDoNotPauseSource(t *testing.T) {
 	}
 }
 
+func TestRecordPublicationStoresOnlyFingerprintsAndSnapshotMetadata(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := PublishedSnapshot{ContentSHA256: "content-hash", ActivePath: "published/subscription.txt", BackupPath: "published/subscription.previous.txt", PublishedAt: time.Now()}
+	if err := store.RecordPublication(context.Background(), []string{"fingerprint-one", "fingerprint-two"}, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordPublication(context.Background(), []string{"fingerprint-one"}, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	var fingerprints, snapshots, successes int
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM candidate_fingerprints").Scan(&fingerprints); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM published_snapshots").Scan(&snapshots); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.db.QueryRow("SELECT success_count FROM candidate_fingerprints WHERE fingerprint='fingerprint-one'").Scan(&successes); err != nil {
+		t.Fatal(err)
+	}
+	if fingerprints != 2 || snapshots != 2 || successes != 2 {
+		t.Fatalf("fingerprints=%d snapshots=%d successes=%d", fingerprints, snapshots, successes)
+	}
+}
+
 func TestPruneExpiredRemovesOnlyExpiredRecords(t *testing.T) {
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
 	if err != nil {

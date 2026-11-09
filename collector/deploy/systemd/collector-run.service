@@ -1,0 +1,16 @@
+[Unit]
+Description=Run one bounded FreeV2ray collector batch
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/freev2ray/collector/deploy
+EnvironmentFile=/etc/freev2ray/collector.env
+ExecStart=/usr/bin/docker compose -f compose.yaml -f compose.runner.yaml run --rm runner
+TimeoutStartSec=60
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

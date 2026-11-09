@@ -20,6 +20,28 @@ import (
 
 const defaultProbeURL = "https://cp.cloudflare.com/generate_204"
 
+// cleanupProbeArtifacts removes configurations left behind by an interrupted
+// probe before a new batch can read or create candidates.
+func cleanupProbeArtifacts(workDir string) error {
+	directory := filepath.Join(workDir, "probe")
+	entries, err := os.ReadDir(directory)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read probe directory: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "sing-box-") || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		if err := os.Remove(filepath.Join(directory, entry.Name())); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove stale probe configuration: %w", err)
+		}
+	}
+	return nil
+}
+
 type probeFailure struct{ category string }
 
 func (failure probeFailure) Error() string { return failure.category }

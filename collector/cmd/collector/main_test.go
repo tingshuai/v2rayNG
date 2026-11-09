@@ -6,16 +6,17 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestServeMuxHealthAndSubscriptionAvailability(t *testing.T) {
 	workDir := t.TempDir()
-	mux := newServeMux(workDir)
+	mux := newServeMux(workDir, time.Hour)
 	healthRequest := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	healthResponse := httptest.NewRecorder()
 	mux.ServeHTTP(healthResponse, healthRequest)
-	if healthResponse.Code != http.StatusNoContent {
-		t.Fatalf("health status = %d, want %d", healthResponse.Code, http.StatusNoContent)
+	if healthResponse.Code != http.StatusServiceUnavailable {
+		t.Fatalf("missing health status = %d, want %d", healthResponse.Code, http.StatusServiceUnavailable)
 	}
 	missingRequest := httptest.NewRequest(http.MethodGet, "/subscription", nil)
 	missingResponse := httptest.NewRecorder()
@@ -38,5 +39,19 @@ func TestServeMuxHealthAndSubscriptionAvailability(t *testing.T) {
 	}
 	if got := readyResponse.Body.String(); got != "c3Vic2NyaXB0aW9u" {
 		t.Fatalf("published subscription = %q", got)
+	}
+	healthResponse = httptest.NewRecorder()
+	mux.ServeHTTP(healthResponse, healthRequest)
+	if healthResponse.Code != http.StatusNoContent {
+		t.Fatalf("fresh health status = %d, want %d", healthResponse.Code, http.StatusNoContent)
+	}
+	stale := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(filepath.Join(published, "subscription.txt"), stale, stale); err != nil {
+		t.Fatal(err)
+	}
+	healthResponse = httptest.NewRecorder()
+	mux.ServeHTTP(healthResponse, healthRequest)
+	if healthResponse.Code != http.StatusServiceUnavailable {
+		t.Fatalf("stale health status = %d, want %d", healthResponse.Code, http.StatusServiceUnavailable)
 	}
 }

@@ -30,6 +30,9 @@ func (store *recordingStore) RecordRun(_ context.Context, _ string, outcome RunO
 	store.outcomes = append(store.outcomes, outcome)
 	return Source{}, nil
 }
+func (store *recordingStore) RecordPublication(context.Context, []string, PublishedSnapshot) error {
+	return nil
+}
 func (store *recordingStore) EnabledSources(context.Context) ([]Source, error) {
 	return store.sources, nil
 }
@@ -40,10 +43,10 @@ func (store *recordingStore) PruneExpired(context.Context, time.Time) error {
 
 func TestPublishAtomicallyKeepsPreviousOutputAsRollback(t *testing.T) {
 	workDir := t.TempDir()
-	if err := publishAtomically(workDir, []string{"one"}); err != nil {
+	if _, err := publishAtomically(workDir, []string{"one"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := publishAtomically(workDir, []string{"two"}); err != nil {
+	if _, err := publishAtomically(workDir, []string{"two"}); err != nil {
 		t.Fatal(err)
 	}
 	previous, err := os.ReadFile(filepath.Join(workDir, "published", "subscription.previous.txt"))
@@ -55,12 +58,29 @@ func TestPublishAtomicallyKeepsPreviousOutputAsRollback(t *testing.T) {
 	}
 }
 
-func TestRemoveExpiredBackupRetainsOnlyRecentRollbackOutput(t *testing.T) {
+func TestPublicationRollbackRemovesFirstOutputWhenAuditCannotBeRecorded(t *testing.T) {
 	workDir := t.TempDir()
-	if err := publishAtomically(workDir, []string{"one"}); err != nil {
+	published, err := publishAtomically(workDir, []string{"one"})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := publishAtomically(workDir, []string{"two"}); err != nil {
+	if published.snapshot.BackupPath != "" {
+		t.Fatalf("first publication backup path = %q, want empty", published.snapshot.BackupPath)
+	}
+	if err := published.rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(workDir, "published", "subscription.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("first publication survived rollback: %v", err)
+	}
+}
+
+func TestRemoveExpiredBackupRetainsOnlyRecentRollbackOutput(t *testing.T) {
+	workDir := t.TempDir()
+	if _, err := publishAtomically(workDir, []string{"one"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := publishAtomically(workDir, []string{"two"}); err != nil {
 		t.Fatal(err)
 	}
 	backup := filepath.Join(workDir, "published", "subscription.previous.txt")

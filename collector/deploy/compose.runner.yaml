@@ -1,0 +1,30 @@
+services:
+  runner:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["run", "-database", "/data/collector.sqlite", "-migrations", "/app/migrations", "-work-dir", "/data", "-fingerprint-key-file", "/run/secrets/collector_fingerprint_key", "-sing-box-path", "/usr/local/bin/sing-box", "-batch-deadline", "30s"]
+    read_only: true
+    user: "65532:65532"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    volumes:
+      - collector-data:/data
+    secrets:
+      - source: collector_fingerprint_key
+        target: collector_fingerprint_key
+        mode: 0400
+    restart: "no"
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    mem_limit: 256m
+
+secrets:
+  collector_fingerprint_key:
+    file: ${COLLECTOR_FINGERPRINT_KEY_FILE:?set an absolute path to the deployment fingerprint key}

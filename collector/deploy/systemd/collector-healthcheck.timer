@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule FreeV2ray collector freshness checks
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=collector-healthcheck.service
+
+[Install]
+WantedBy=timers.target

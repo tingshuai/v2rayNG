@@ -3,11 +3,39 @@ package collector
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"net/netip"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 )
+
+func TestCleanupProbeArtifactsRemovesOnlyProbeConfigurations(t *testing.T) {
+	workDir := t.TempDir()
+	directory := filepath.Join(workDir, "probe")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stale := filepath.Join(directory, "sing-box-stale.json")
+	preserve := filepath.Join(directory, "other.json")
+	if err := os.WriteFile(stale, []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(preserve, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := cleanupProbeArtifacts(workDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("stale probe configuration still exists: %v", err)
+	}
+	if _, err := os.Stat(preserve); err != nil {
+		t.Fatalf("non-probe file was removed: %v", err)
+	}
+}
 
 func TestSingBoxConfigUsesResolvedPublicAddressAndTLSName(t *testing.T) {
 	candidate := (&url.URL{
