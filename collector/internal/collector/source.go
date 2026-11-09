@@ -63,6 +63,7 @@ func (registration SourceRegistration) Validate() error {
 
 type Store interface {
 	RegisterSource(ctx context.Context, registration SourceRegistration) error
+	UpdateSource(ctx context.Context, registration SourceRegistration, reason string) error
 	PauseSource(ctx context.Context, sourceID, reason string) error
 	EnableSource(ctx context.Context, sourceID, reason string) error
 	DeleteSource(ctx context.Context, sourceID, reason string) error

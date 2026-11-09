@@ -72,7 +72,7 @@ func migrate(arguments []string) {
 
 func source(arguments []string) {
 	if len(arguments) < 1 {
-		fail(errors.New("usage: collector source <add|pause|enable|delete>"))
+		fail(errors.New("usage: collector source <add|update|pause|enable|delete>"))
 	}
 	action := arguments[0]
 	flags := flag.NewFlagSet("collector source "+action, flag.ExitOnError)
@@ -96,6 +96,14 @@ func source(arguments []string) {
 			fail(err)
 		}
 		slog.Info("source registered", "source_id", *id)
+	case "update":
+		if !*distributionAllowed {
+			fail(errors.New("-distribution-allowed is required to update a source"))
+		}
+		if err := store.UpdateSource(ctx, collector.SourceRegistration{ID: *id, FetchURL: *url, MinFetchInterval: *interval}, *reason); err != nil {
+			fail(err)
+		}
+		slog.Info("source updated", "source_id", *id)
 	case "pause":
 		if err := store.PauseSource(ctx, *id, *reason); err != nil {
 			fail(err)
@@ -125,13 +133,19 @@ func serve(arguments []string) {
 	flags.Parse(arguments)
 	store := openAndMigrate(*database, *migrations)
 	defer store.Close()
+	server := &http.Server{Addr: *listen, Handler: newServeMux(*workDir), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	slog.Info("collector listening", "address", *listen)
+	fail(server.ListenAndServe())
+}
+
+func newServeMux(workDir string) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Cache-Control", "no-store")
 		writer.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /subscription", func(writer http.ResponseWriter, request *http.Request) {
-		output, err := os.ReadFile(filepath.Join(*workDir, "published", "subscription.txt"))
+		output, err := os.ReadFile(filepath.Join(workDir, "published", "subscription.txt"))
 		if errors.Is(err, os.ErrNotExist) {
 			http.Error(writer, "subscription unavailable", http.StatusServiceUnavailable)
 			return
@@ -145,9 +159,7 @@ func serve(arguments []string) {
 		writer.Header().Set("Cache-Control", "public, max-age=300")
 		_, _ = writer.Write(output)
 	})
-	server := &http.Server{Addr: *listen, Handler: mux, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
-	slog.Info("collector listening", "address", *listen)
-	fail(server.ListenAndServe())
+	return mux
 }
 
 func openAndMigrate(database, migrations string) *collector.SQLiteStore {

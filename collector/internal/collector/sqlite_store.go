@@ -102,6 +102,36 @@ func (store *SQLiteStore) RegisterSource(ctx context.Context, registration Sourc
 	return tx.Commit()
 }
 
+func (store *SQLiteStore) UpdateSource(ctx context.Context, registration SourceRegistration, reason string) error {
+	if err := registration.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(reason) == "" {
+		return errors.New("source update reason is required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, `UPDATE sources SET fetch_url=?, min_fetch_interval_seconds=?, updated_at=? WHERE source_id=?`, registration.FetchURL, int(registration.MinFetchInterval.Seconds()), now, registration.ID)
+	if err != nil {
+		return err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if changed == 0 {
+		return ErrSourceNotFound
+	}
+	if _, err = tx.ExecContext(ctx, "INSERT INTO source_audit(source_id, action, reason, occurred_at) VALUES(?, 'updated', ?, ?)", registration.ID, reason, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (store *SQLiteStore) PauseSource(ctx context.Context, sourceID, reason string) error {
 	return store.setSourceEnabled(ctx, sourceID, false, reason, "paused")
 }

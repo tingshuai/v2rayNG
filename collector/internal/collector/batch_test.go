@@ -15,9 +15,12 @@ type recordingStore struct {
 }
 
 func (store *recordingStore) RegisterSource(context.Context, SourceRegistration) error { return nil }
-func (store *recordingStore) PauseSource(context.Context, string, string) error        { return nil }
-func (store *recordingStore) EnableSource(context.Context, string, string) error       { return nil }
-func (store *recordingStore) DeleteSource(context.Context, string, string) error       { return nil }
+func (store *recordingStore) UpdateSource(context.Context, SourceRegistration, string) error {
+	return nil
+}
+func (store *recordingStore) PauseSource(context.Context, string, string) error  { return nil }
+func (store *recordingStore) EnableSource(context.Context, string, string) error { return nil }
+func (store *recordingStore) DeleteSource(context.Context, string, string) error { return nil }
 func (store *recordingStore) RecordRun(context.Context, string, RunOutcome, int, string) (Source, error) {
 	return Source{}, nil
 }

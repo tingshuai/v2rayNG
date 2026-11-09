@@ -115,3 +115,36 @@ func TestDeleteSourceRemovesConfigurationAndKeepsAuditSummary(t *testing.T) {
 		t.Fatalf("deletion audits = %d, want 1", deletionAudits)
 	}
 }
+
+func TestUpdateSourceChangesConfigurationAndAuditsReason(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	registration := SourceRegistration{ID: "source-update", FetchURL: "https://source.example/first", MinFetchInterval: time.Minute}
+	if err := store.RegisterSource(context.Background(), registration); err != nil {
+		t.Fatal(err)
+	}
+	updated := SourceRegistration{ID: registration.ID, FetchURL: "https://source.example/second", MinFetchInterval: 2 * time.Minute}
+	if err := store.UpdateSource(context.Background(), updated, "operator_request"); err != nil {
+		t.Fatal(err)
+	}
+	source, err := store.source(context.Background(), registration.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if source.FetchURL != updated.FetchURL || source.MinFetchInterval != updated.MinFetchInterval {
+		t.Fatalf("source after update = %#v", source)
+	}
+	var updates int
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM source_audit WHERE source_id = ? AND action = 'updated' AND reason = 'operator_request'", registration.ID).Scan(&updates); err != nil {
+		t.Fatal(err)
+	}
+	if updates != 1 {
+		t.Fatalf("update audits = %d, want 1", updates)
+	}
+}
