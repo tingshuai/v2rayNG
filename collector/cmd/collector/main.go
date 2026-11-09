@@ -40,6 +40,7 @@ func run(arguments []string) {
 	keyFile := flags.String("fingerprint-key-file", "", "path to a 32-byte deployment secret")
 	singBoxPath := flags.String("sing-box-path", "/usr/local/bin/sing-box", "path to the restricted sing-box binary")
 	probeURL := flags.String("probe-url", "", "unauthenticated HTTPS endpoint expected to return HTTP 204")
+	batchDeadline := flags.Duration("batch-deadline", 0, "optional bounded duration for one batch run")
 	flags.Parse(arguments)
 	if *keyFile == "" {
 		fail(errors.New("-fingerprint-key-file is required"))
@@ -51,7 +52,7 @@ func run(arguments []string) {
 	store := openAndMigrate(*database, *migrations)
 	defer store.Close()
 	fetcher := collector.NewSafeFetcher(nil)
-	runner := collector.BatchRunner{Store: store, Fetcher: fetcher, WorkDir: *workDir, FingerprintKey: key, Prober: collector.SingBoxProber{BinaryPath: *singBoxPath, ProbeURL: *probeURL, Resolver: fetcher.Resolver, WorkDir: *workDir}}
+	runner := collector.BatchRunner{Store: store, Fetcher: fetcher, WorkDir: *workDir, FingerprintKey: key, FastDeadline: *batchDeadline, Prober: collector.SingBoxProber{BinaryPath: *singBoxPath, ProbeURL: *probeURL, Resolver: fetcher.Resolver, WorkDir: *workDir}}
 	if err := runner.Run(context.Background()); err != nil {
 		fail(err)
 	}
