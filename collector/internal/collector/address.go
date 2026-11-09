@@ -19,6 +19,7 @@ func IsPublicAddress(address netip.Addr) bool {
 			if prefix.Contains(address) {
 				return false
 			}
+		}
 	}
 	return true
 }

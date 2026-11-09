@@ -17,15 +17,15 @@ const (
 var ErrSourceNotFound = errors.New("source not found")
 
 type Source struct {
-	ID                      string
-	FetchURL                string
-	Enabled                 bool
-	ContractVersion         int
-	MinFetchInterval        time.Duration
-	LastSuccessAt           *time.Time
-	LastFailureAt           *time.Time
-	ConsecutiveFailures     int
-	PausedReason            string
+	ID                  string
+	FetchURL            string
+	Enabled             bool
+	ContractVersion     int
+	MinFetchInterval    time.Duration
+	LastSuccessAt       *time.Time
+	LastFailureAt       *time.Time
+	ConsecutiveFailures int
+	PausedReason        string
 }
 
 type SourceRegistration struct {
