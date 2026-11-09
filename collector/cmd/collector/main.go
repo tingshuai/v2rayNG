@@ -72,7 +72,7 @@ func migrate(arguments []string) {
 
 func source(arguments []string) {
 	if len(arguments) < 1 {
-		fail(errors.New("usage: collector source <add|pause|enable>"))
+		fail(errors.New("usage: collector source <add|pause|enable|delete>"))
 	}
 	action := arguments[0]
 	flags := flag.NewFlagSet("collector source "+action, flag.ExitOnError)
@@ -106,6 +106,11 @@ func source(arguments []string) {
 			fail(err)
 		}
 		slog.Info("source enabled", "source_id", *id)
+	case "delete":
+		if err := store.DeleteSource(ctx, *id, *reason); err != nil {
+			fail(err)
+		}
+		slog.Info("source deleted", "source_id", *id)
 	default:
 		fail(fmt.Errorf("unknown source action %q", action))
 	}

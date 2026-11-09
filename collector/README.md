@@ -11,6 +11,7 @@ go test ./...
 go run ./cmd/collector migrate -database ./data/collector.sqlite
 go run ./cmd/collector source add -database ./data/collector.sqlite -id example -url https://source.example/subscription -distribution-allowed
 go run ./cmd/collector source pause -database ./data/collector.sqlite -id example -reason operator_request
+go run ./cmd/collector source delete -database ./data/collector.sqlite -id example -reason operator_request
 go run ./cmd/collector run -database ./data/collector.sqlite -work-dir ./data -fingerprint-key-file /run/secrets/collector_fingerprint_key
 go run ./cmd/collector serve -database ./data/collector.sqlite -work-dir ./data -listen 127.0.0.1:8080
 ```

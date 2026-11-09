@@ -13,7 +13,16 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
+)
+
+const (
+	defaultBatchDeadline  = 30 * time.Second
+	defaultTCPConcurrency = 2
+	maxTCPConcurrency     = 2
+	maxScreenedCandidates = 50
+	backupRetention       = 7 * 24 * time.Hour
 )
 
 type BatchRunner struct {
@@ -30,13 +39,17 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 		return errors.New("fingerprint key must contain at least 32 bytes")
 	}
 	if runner.FastDeadline <= 0 {
-		runner.FastDeadline = 30 * time.Second
+		runner.FastDeadline = defaultBatchDeadline
 	}
-	if runner.TCPConcurrency <= 0 {
-		runner.TCPConcurrency = 2
-	}
+	runner.TCPConcurrency = runner.effectiveTCPConcurrency()
 	ctx, cancel := context.WithTimeout(ctx, runner.FastDeadline)
 	defer cancel()
+	if err := removeExpiredBackup(runner.WorkDir, time.Now()); err != nil {
+		return fmt.Errorf("remove expired subscription backup: %w", err)
+	}
+	if err := runner.Store.PruneExpired(ctx, time.Now()); err != nil {
+		return fmt.Errorf("prune expired collector records: %w", err)
+	}
 	sources, err := runner.Store.EnabledSources(ctx)
 	if err != nil {
 		return err
@@ -46,6 +59,9 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 	for _, source := range sources {
 		if ctx.Err() != nil {
 			break
+		}
+		if !source.IsDue(time.Now()) {
+			continue
 		}
 		candidates, fetchErr := runner.fetchAndScreen(ctx, source)
 		if fetchErr != nil {
@@ -70,6 +86,16 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 	return publishAtomically(runner.WorkDir, accepted)
 }
 
+func (runner BatchRunner) effectiveTCPConcurrency() int {
+	if runner.TCPConcurrency <= 0 {
+		return defaultTCPConcurrency
+	}
+	if runner.TCPConcurrency > maxTCPConcurrency {
+		return maxTCPConcurrency
+	}
+	return runner.TCPConcurrency
+}
+
 func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source) ([]string, error) {
 	body, err := runner.Fetcher.Fetch(ctx, source)
 	if err != nil {
@@ -88,14 +114,17 @@ func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source) ([]
 
 func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string) []string {
 	limit := len(candidates)
-	if limit > 50 {
-		limit = 50
+	if limit > maxScreenedCandidates {
+		limit = maxScreenedCandidates
 	}
 	candidates = candidates[:limit]
 	accepted := make(chan string, limit)
 	jobs := make(chan string)
+	var workers sync.WaitGroup
 	for range runner.TCPConcurrency {
+		workers.Add(1)
 		go func() {
+			defer workers.Done()
 			for candidate := range jobs {
 				endpoint, err := candidateEndpoint(candidate)
 				if err == nil {
@@ -113,6 +142,10 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 		}()
 	}
 	go func() {
+		workers.Wait()
+		close(accepted)
+	}()
+	go func() {
 		defer close(jobs)
 		for _, candidate := range candidates {
 			select {
@@ -123,17 +156,17 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 		}
 	}()
 	result := make([]string, 0, limit)
-	for range candidates {
+	for {
 		select {
-		case candidate := <-accepted:
+		case candidate, open := <-accepted:
+			if !open {
+				return result
+			}
 			result = append(result, candidate)
 		case <-ctx.Done():
 			return result
-		case <-time.After(3 * time.Second):
-			return result
 		}
 	}
-	return result
 }
 
 func candidateEndpoint(candidate string) (string, error) {
@@ -201,6 +234,24 @@ func publishAtomically(workDir string, candidates []string) error {
 		if err := os.Rename(active, backup); err != nil {
 			return err
 		}
+		if err := os.Chtimes(backup, time.Now(), time.Now()); err != nil {
+			return err
+		}
 	}
 	return os.Rename(temporaryName, active)
+}
+
+func removeExpiredBackup(workDir string, now time.Time) error {
+	backup := filepath.Join(workDir, "published", "subscription.previous.txt")
+	info, err := os.Stat(backup)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if now.Before(info.ModTime().Add(backupRetention)) {
+		return nil
+	}
+	return os.Remove(backup)
 }

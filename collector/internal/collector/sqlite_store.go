@@ -109,6 +109,33 @@ func (store *SQLiteStore) EnableSource(ctx context.Context, sourceID, reason str
 	return store.setSourceEnabled(ctx, sourceID, true, reason, "enabled")
 }
 
+func (store *SQLiteStore) DeleteSource(ctx context.Context, sourceID, reason string) error {
+	if strings.TrimSpace(reason) == "" {
+		return errors.New("source deletion reason is required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, "DELETE FROM sources WHERE source_id = ?", sourceID)
+	if err != nil {
+		return err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if changed == 0 {
+		return ErrSourceNotFound
+	}
+	if _, err = tx.ExecContext(ctx, "INSERT INTO source_audit(source_id, action, reason, occurred_at) VALUES(?, 'deleted', ?, ?)", sourceID, reason, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (store *SQLiteStore) setSourceEnabled(ctx context.Context, sourceID string, enabled bool, reason, action string) error {
 	if strings.TrimSpace(reason) == "" {
 		return errors.New("source state change reason is required")
@@ -254,14 +281,19 @@ func scanSource(row scanner) (Source, error) {
 }
 
 func (store *SQLiteStore) PruneExpired(ctx context.Context, now time.Time) error {
-	_, err := store.db.ExecContext(ctx, "DELETE FROM source_audit WHERE occurred_at < ?", now.Add(-auditRetention).UTC().Format(time.RFC3339Nano))
+	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	_, err = store.db.ExecContext(ctx, "DELETE FROM source_runs WHERE finished_at < ?", now.Add(-runRetention).UTC().Format(time.RFC3339Nano))
-	if err != nil {
+	defer tx.Rollback()
+	if _, err = tx.ExecContext(ctx, "DELETE FROM source_audit WHERE occurred_at < ?", now.Add(-auditRetention).UTC().Format(time.RFC3339Nano)); err != nil {
 		return err
 	}
-	_, err = store.db.ExecContext(ctx, "DELETE FROM candidate_fingerprints WHERE last_seen_at < ?", now.Add(-runRetention).UTC().Format(time.RFC3339Nano))
-	return err
+	if _, err = tx.ExecContext(ctx, "DELETE FROM source_runs WHERE finished_at < ?", now.Add(-runRetention).UTC().Format(time.RFC3339Nano)); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM candidate_fingerprints WHERE last_seen_at < ?", now.Add(-runRetention).UTC().Format(time.RFC3339Nano)); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
