@@ -1,8 +1,25 @@
 services:
+  init-data:
+    image: busybox:1.37.0
+    user: "0:0"
+    command: ["sh", "-c", "mkdir -p /data && chown 65532:65532 /data && chmod 700 /data"]
+    read_only: true
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - FOWNER
+    volumes:
+      - collector-data:/data
+
   collector:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
+    command: ["serve", "-database", "/data/collector.sqlite", "-migrations", "/app/migrations", "-work-dir", "/data", "-listen", "0.0.0.0:8080"]
     read_only: true
     user: "65532:65532"
     tmpfs:
@@ -12,6 +29,9 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     restart: unless-stopped
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
     security_opt:
       - no-new-privileges:true
     cap_drop:
