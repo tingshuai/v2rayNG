@@ -84,7 +84,6 @@ func source(arguments []string) {
 	id := flags.String("id", "", "stable source ID")
 	url := flags.String("url", "", "unauthenticated HTTPS source URL")
 	interval := flags.Duration("min-fetch-interval", 15*time.Minute, "minimum interval between source fetches")
-	distributionAllowed := flags.Bool("distribution-allowed", false, "explicitly confirm the source allows subscription distribution")
 	reason := flags.String("reason", "operator_request", "non-secret state-change reason")
 	flags.Parse(arguments[1:])
 	store := openAndMigrate(*database, *migrations)
@@ -92,17 +91,11 @@ func source(arguments []string) {
 	ctx := context.Background()
 	switch action {
 	case "add":
-		if !*distributionAllowed {
-			fail(errors.New("-distribution-allowed is required to register a source"))
-		}
 		if err := store.RegisterSource(ctx, collector.SourceRegistration{ID: *id, FetchURL: *url, MinFetchInterval: *interval}); err != nil {
 			fail(err)
 		}
 		slog.Info("source registered", "source_id", *id)
 	case "update":
-		if !*distributionAllowed {
-			fail(errors.New("-distribution-allowed is required to update a source"))
-		}
 		if err := store.UpdateSource(ctx, collector.SourceRegistration{ID: *id, FetchURL: *url, MinFetchInterval: *interval}, *reason); err != nil {
 			fail(err)
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/netip"
 	"testing"
+	"time"
 )
 
 type staticResolver struct{ addresses []netip.Addr }
@@ -26,5 +27,13 @@ func TestSplitCandidatesRejectsOversizedCandidateSet(t *testing.T) {
 	}
 	if _, err := splitCandidates(body); err == nil {
 		t.Fatal("oversized candidate set was accepted")
+	}
+}
+
+func TestResolveSourceURLExpandsDailyTokenInUTC(t *testing.T) {
+	now := time.Date(2026, time.November, 9, 0, 30, 0, 0, time.FixedZone("UTC+8", 8*60*60))
+	got := resolveSourceURL("https://source.example/{YYYYMMDD}-v2ray.txt", now)
+	if got != "https://source.example/20261108-v2ray.txt" {
+		t.Fatalf("resolved URL = %q", got)
 	}
 }

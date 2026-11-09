@@ -38,14 +38,15 @@ func NewSafeFetcher(resolver Resolver) *SafeFetcher {
 }
 
 func (fetcher *SafeFetcher) Fetch(ctx context.Context, source Source) ([]byte, error) {
-	parsed, err := url.Parse(source.FetchURL)
+	fetchURL := resolveSourceURL(source.FetchURL, time.Now().UTC())
+	parsed, err := url.Parse(fetchURL)
 	if err != nil {
 		return nil, err
 	}
 	if err := validatePublicHost(ctx, fetcher.Resolver, parsed.Hostname()); err != nil {
 		return nil, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, source.FetchURL, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fetchURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +59,12 @@ func (fetcher *SafeFetcher) Fetch(ctx context.Context, source Source) ([]byte, e
 		return nil, fmt.Errorf("unexpected source status: %d", response.StatusCode)
 	}
 	return io.ReadAll(io.LimitReader(response.Body, maxSourceBytes+1))
+}
+
+// resolveSourceURL expands the sole supported dynamic path token. It allows a
+// daily public feed to remain configured without HTML scraping or redirects.
+func resolveSourceURL(rawURL string, now time.Time) string {
+	return strings.ReplaceAll(rawURL, "{YYYYMMDD}", now.UTC().Format("20060102"))
 }
 
 func safeDialContext(resolver Resolver, dialer *net.Dialer) func(context.Context, string, string) (net.Conn, error) {
