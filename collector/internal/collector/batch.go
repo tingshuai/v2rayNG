@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/url"
 	"os"
@@ -106,7 +107,12 @@ func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source) ([]
 	if err != nil {
 		return nil, err
 	}
+	screened := candidates
+	if runner.Prober != nil {
+		screened = selectProbeCandidates(candidates)
+	}
 	accepted := runner.screenCandidates(ctx, candidates)
+	slog.Info("candidate screening summary", "component", "batch", "source_id", source.ID, "received_count", len(candidates), "eligible_count", len(screened), "accepted_count", len(accepted))
 	if len(accepted) == 0 {
 		return nil, errors.New("no candidates passed bounded TCP screening")
 	}
@@ -114,11 +120,12 @@ func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source) ([]
 }
 
 func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string) []string {
-	limit := len(candidates)
-	if limit > maxScreenedCandidates {
-		limit = maxScreenedCandidates
+	if runner.Prober != nil {
+		candidates = selectProbeCandidates(candidates)
+	} else if len(candidates) > maxScreenedCandidates {
+		candidates = candidates[:maxScreenedCandidates]
 	}
-	candidates = candidates[:limit]
+	limit := len(candidates)
 	accepted := make(chan string, limit)
 	jobs := make(chan string)
 	var workers sync.WaitGroup
@@ -171,6 +178,24 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 			return result
 		}
 	}
+}
+
+func selectProbeCandidates(candidates []string) []string {
+	eligible := make([]string, 0, maxScreenedCandidates)
+	for _, candidate := range candidates {
+		if !supportsBoundedProbe(candidate) {
+			continue
+		}
+		eligible = append(eligible, candidate)
+	}
+	if len(eligible) <= maxScreenedCandidates {
+		return eligible
+	}
+	selected := make([]string, 0, maxScreenedCandidates)
+	for index := range maxScreenedCandidates {
+		selected = append(selected, eligible[index*len(eligible)/maxScreenedCandidates])
+	}
+	return selected
 }
 
 func candidateEndpoint(candidate string) (string, error) {

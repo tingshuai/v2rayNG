@@ -14,7 +14,10 @@ import (
 	"time"
 )
 
-const maxSourceBytes = 2 << 20
+const (
+	maxSourceBytes      = 2 << 20
+	maxSourceCandidates = 5000
+)
 
 type Resolver interface {
 	LookupNetIP(context.Context, string, string) ([]netip.Addr, error)
@@ -112,7 +115,7 @@ func splitCandidates(body []byte) ([]string, error) {
 	if len(lines) == 0 {
 		return nil, errors.New("source contained no candidates")
 	}
-	if len(lines) > 500 {
+	if len(lines) > maxSourceCandidates {
 		return nil, errors.New("source candidate count exceeds limit")
 	}
 	return lines, nil

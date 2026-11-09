@@ -20,8 +20,8 @@ func TestValidatePublicHostRejectsNonPublicResolution(t *testing.T) {
 }
 
 func TestSplitCandidatesRejectsOversizedCandidateSet(t *testing.T) {
-	body := make([]byte, 0, 2000)
-	for range 501 {
+	body := make([]byte, 0, maxSourceCandidates*10)
+	for range maxSourceCandidates + 1 {
 		body = append(body, "candidate "...)
 	}
 	if _, err := splitCandidates(body); err == nil {

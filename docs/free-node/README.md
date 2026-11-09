@@ -11,6 +11,7 @@
 - [P0 测试夹具](fixtures/README.md)：不含节点配置或秘密的确定性输入与预期结果。
 - [订阅与元数据契约](feed-schema.md)：服务端对客户端的稳定输出约定。
 - [采集服务运行手册](collector-runbook.md)：独立采集服务的边界、检查及应急处理。
+- [来源审查记录](source-review.md)：接入、弃用和重新评估来源的可复核决定。
 - [数据保留与威胁模型](threat-model.md)：风险、隐私和日志规则。
 - [Android 状态与选择设计](android-selection.md)：客户端测试、排序、隔离和切换逻辑。
 - [上游同步清单](upstream-sync-checklist.md)：同步 v2rayNG 上游时的检查步骤。

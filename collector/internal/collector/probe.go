@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -168,10 +170,62 @@ func (prober SingBoxProber) config(ctx context.Context, candidate string) (singB
 		outbound["type"] = "trojan"
 		outbound["password"] = parsed.User.Username()
 		outbound["tls"] = map[string]any{"enabled": true, "server_name": serverName(parsed)}
+	case "ss":
+		method, password, err := shadowsocksCredentials(parsed)
+		if err != nil {
+			return singBoxConfig{}, err
+		}
+		outbound["type"] = "shadowsocks"
+		outbound["method"] = method
+		outbound["password"] = password
 	default:
 		return singBoxConfig{}, errors.New("candidate protocol is not supported by bounded probe")
 	}
 	return singBoxConfig{Log: map[string]any{"disabled": true}, Inbounds: []singBoxInbound{{Type: "mixed", Tag: "probe-in", Listen: "127.0.0.1"}}, Outbounds: []map[string]any{outbound}, Route: map[string]string{"final": "probe-out"}}, nil
+}
+
+func supportsBoundedProbe(candidate string) bool {
+	parsed, err := url.Parse(candidate)
+	if err != nil || parsed.Port() == "" || parsed.User == nil {
+		return false
+	}
+	transport := parsed.Query().Get("type")
+	if transport != "" && transport != "tcp" {
+		return false
+	}
+	switch parsed.Scheme {
+	case "vless":
+		security := parsed.Query().Get("security")
+		return security == "" || security == "none" || security == "tls"
+	case "trojan", "ss":
+		return true
+	default:
+		return false
+	}
+}
+
+func shadowsocksCredentials(parsed *url.URL) (string, string, error) {
+	rawUser := parsed.User.Username()
+	if decoded, err := decodeBase64(rawUser); err == nil {
+		rawUser = decoded
+	}
+	method, password, found := strings.Cut(rawUser, ":")
+	if !found || method == "" || password == "" {
+		return "", "", errors.New("shadowsocks candidate has invalid credentials")
+	}
+	return method, password, nil
+}
+
+func decodeBase64(value string) (string, error) {
+	value = strings.TrimRight(value, "=")
+	decoded, err := base64.RawStdEncoding.DecodeString(value)
+	if err != nil {
+		decoded, err = base64.RawURLEncoding.DecodeString(value)
+	}
+	if err != nil {
+		return "", err
+	}
+	return string(decoded), nil
 }
 
 func publicEndpoint(ctx context.Context, resolver Resolver, host, port string) (string, error) {
