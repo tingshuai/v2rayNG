@@ -32,6 +32,7 @@ type BatchRunner struct {
 	FingerprintKey []byte
 	FastDeadline   time.Duration
 	TCPConcurrency int
+	Prober         CandidateProber
 }
 
 func (runner BatchRunner) Run(ctx context.Context) error {
@@ -131,6 +132,9 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 					probeContext, cancel := context.WithTimeout(ctx, 3*time.Second)
 					err = tcpReachable(probeContext, runner.Fetcher.Resolver, endpoint)
 					cancel()
+					if err == nil && runner.Prober != nil {
+						err = runner.Prober.Probe(probeContext, candidate)
+					}
 					if err == nil {
 						select {
 						case accepted <- candidate:

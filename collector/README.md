@@ -13,7 +13,7 @@ go run ./cmd/collector source add -database ./data/collector.sqlite -id example 
 go run ./cmd/collector source update -database ./data/collector.sqlite -id example -url https://source.example/subscription-v2 -min-fetch-interval 30m -distribution-allowed -reason operator_request
 go run ./cmd/collector source pause -database ./data/collector.sqlite -id example -reason operator_request
 go run ./cmd/collector source delete -database ./data/collector.sqlite -id example -reason operator_request
-go run ./cmd/collector run -database ./data/collector.sqlite -work-dir ./data -fingerprint-key-file /run/secrets/collector_fingerprint_key
+go run ./cmd/collector run -database ./data/collector.sqlite -work-dir ./data -fingerprint-key-file /run/secrets/collector_fingerprint_key -sing-box-path /usr/local/bin/sing-box
 go run ./cmd/collector serve -database ./data/collector.sqlite -work-dir ./data -listen 127.0.0.1:8080
 ```
 
@@ -21,4 +21,4 @@ Commands never print a source URL, candidate configuration, credential, UUID, pr
 
 Use the deployment sample in `deploy/` for a non-root container and bind the service only to loopback before exposing it through the configured tunnel. Runtime state and deployment secrets are Git-ignored.
 
-Each batch enforces a source-body and candidate-count limit, checks public DNS resolution before the request and again immediately before each TCP connection, and preserves the previous subscription if no screened candidate can be published. The current MVP accepts URI protocols that expose a direct hostname and port (`vless`, `trojan`, and `ss`) for bounded TCP reachability screening. Protocol-specific TLS and proxied HTTP 204 screening require the restricted sing-box runner and remain disabled until that runner is packaged and tested; candidates without a supported endpoint are rejected rather than guessed.
+Each batch enforces a source-body and candidate-count limit, checks public DNS resolution before the request and again immediately before each TCP connection, and preserves the previous subscription if no screened candidate can be published. VLESS and Trojan candidates using direct TCP are then tested by a short-lived, resource-constrained sing-box process through a small HTTPS HTTP 204 request. The process receives an ephemeral `0600` configuration file which is removed when the probe ends; candidates using an unsupported transport or protocol are rejected rather than guessed.
