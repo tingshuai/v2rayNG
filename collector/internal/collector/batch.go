@@ -19,21 +19,38 @@ import (
 )
 
 const (
-	defaultBatchDeadline  = 30 * time.Second
-	defaultTCPConcurrency = 2
-	maxTCPConcurrency     = 2
-	maxScreenedCandidates = 50
-	backupRetention       = 7 * 24 * time.Hour
+	defaultBatchDeadline    = 30 * time.Second
+	finalizationDeadline    = 5 * time.Second
+	defaultFetchConcurrency = 4
+	maxFetchConcurrency     = 4
+	defaultTCPConcurrency   = 2
+	maxTCPConcurrency       = 2
+	maxScreenedCandidates   = 50
+	backupRetention         = 7 * 24 * time.Hour
 )
 
 type BatchRunner struct {
-	Store          Store
-	Fetcher        *SafeFetcher
-	WorkDir        string
-	FingerprintKey []byte
-	FastDeadline   time.Duration
-	TCPConcurrency int
-	Prober         CandidateProber
+	Store            Store
+	Fetcher          SourceFetcher
+	Resolver         Resolver
+	TCPChecker       func(context.Context, Resolver, string) error
+	WorkDir          string
+	FingerprintKey   []byte
+	FastDeadline     time.Duration
+	FetchConcurrency int
+	TCPConcurrency   int
+	Prober           CandidateProber
+}
+
+type SourceFetcher interface {
+	Fetch(context.Context, Source) ([]byte, error)
+}
+
+type sourceScreenResult struct {
+	source     Source
+	candidates []string
+	err        error
+	deferred   bool
 }
 
 func (runner BatchRunner) Run(ctx context.Context) error {
@@ -44,36 +61,39 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 		runner.FastDeadline = defaultBatchDeadline
 	}
 	runner.TCPConcurrency = runner.effectiveTCPConcurrency()
-	ctx, cancel := context.WithTimeout(ctx, runner.FastDeadline)
+	screeningCtx, cancel := context.WithTimeout(ctx, runner.FastDeadline)
 	defer cancel()
 	if err := removeExpiredBackup(runner.WorkDir, time.Now()); err != nil {
 		return fmt.Errorf("remove expired subscription backup: %w", err)
 	}
-	if err := runner.Store.PruneExpired(ctx, time.Now()); err != nil {
+	if err := runner.Store.PruneExpired(screeningCtx, time.Now()); err != nil {
 		return fmt.Errorf("prune expired collector records: %w", err)
 	}
-	sources, err := runner.Store.EnabledSources(ctx)
+	sources, err := runner.Store.EnabledSources(screeningCtx)
 	if err != nil {
 		return err
 	}
+	due := make([]Source, 0, len(sources))
+	for _, source := range sources {
+		if source.IsDue(time.Now()) {
+			due = append(due, source)
+		}
+	}
 	var accepted []string
 	seen := map[string]struct{}{}
-	for _, source := range sources {
-		if ctx.Err() != nil {
-			break
+	deferredSources := 0
+	for result := range runner.screenSources(screeningCtx, due) {
+		outcome, errorCode := sourceRunOutcome(result)
+		if outcome == RunDeferred {
+			deferredSources++
 		}
-		if !source.IsDue(time.Now()) {
-			continue
-		}
-		candidates, fetchErr := runner.fetchAndScreen(ctx, source)
-		if fetchErr != nil {
-			_, _ = runner.Store.RecordRun(ctx, source.ID, RunFailed, 0, "fetch_or_screen_failed")
-			continue
-		}
-		if _, err := runner.Store.RecordRun(ctx, source.ID, RunSucceeded, len(candidates), ""); err != nil {
+		if err := runner.recordRun(ctx, result.source.ID, outcome, len(result.candidates), errorCode); err != nil {
 			return err
 		}
-		for _, candidate := range candidates {
+		if result.err != nil {
+			continue
+		}
+		for _, candidate := range result.candidates {
 			fingerprint := fingerprint(runner.FingerprintKey, candidate)
 			if _, exists := seen[fingerprint]; !exists {
 				seen[fingerprint] = struct{}{}
@@ -85,7 +105,65 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 		return errors.New("batch produced no screened candidates; retained previous output")
 	}
 	sort.Strings(accepted)
-	return publishAtomically(runner.WorkDir, accepted)
+	finalizationCtx, finalizationCancel := context.WithTimeout(ctx, finalizationDeadline)
+	defer finalizationCancel()
+	if err := finalizationCtx.Err(); err != nil {
+		return fmt.Errorf("finalize batch: %w", err)
+	}
+	if err := publishAtomically(runner.WorkDir, accepted); err != nil {
+		return err
+	}
+	slog.Info("collector batch published", "component", "batch", "enabled_source_count", len(sources), "due_source_count", len(due), "deferred_source_count", deferredSources, "published_candidate_count", len(accepted), "screening_deadline_exceeded", screeningCtx.Err() != nil)
+	return nil
+}
+
+func (runner BatchRunner) screenSources(ctx context.Context, sources []Source) <-chan sourceScreenResult {
+	results := make(chan sourceScreenResult, len(sources))
+	jobs := make(chan Source)
+	workers := runner.effectiveFetchConcurrency()
+	probeSlots := make(chan struct{}, runner.effectiveTCPConcurrency())
+	var group sync.WaitGroup
+	for range workers {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			for source := range jobs {
+				candidates, deferred, err := runner.fetchAndScreen(ctx, source, probeSlots)
+				results <- sourceScreenResult{source: source, candidates: candidates, deferred: deferred, err: err}
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for _, source := range sources {
+			jobs <- source
+		}
+	}()
+	go func() {
+		group.Wait()
+		close(results)
+	}()
+	return results
+}
+
+func (runner BatchRunner) recordRun(ctx context.Context, sourceID string, outcome RunOutcome, candidateCount int, errorCode string) error {
+	finalizationCtx, cancel := context.WithTimeout(ctx, finalizationDeadline)
+	defer cancel()
+	_, err := runner.Store.RecordRun(finalizationCtx, sourceID, outcome, candidateCount, errorCode)
+	return err
+}
+
+func sourceRunOutcome(result sourceScreenResult) (RunOutcome, string) {
+	if result.deferred {
+		return RunDeferred, "batch_deadline_exceeded"
+	}
+	if errors.Is(result.err, ErrNoScreenedCandidates) {
+		return RunScreenedOut, "no_candidates_passed"
+	}
+	if result.err != nil {
+		return RunFailed, "fetch_or_parse_failed"
+	}
+	return RunSucceeded, ""
 }
 
 func (runner BatchRunner) effectiveTCPConcurrency() int {
@@ -98,28 +176,38 @@ func (runner BatchRunner) effectiveTCPConcurrency() int {
 	return runner.TCPConcurrency
 }
 
-func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source) ([]string, error) {
+func (runner BatchRunner) effectiveFetchConcurrency() int {
+	if runner.FetchConcurrency <= 0 {
+		return defaultFetchConcurrency
+	}
+	if runner.FetchConcurrency > maxFetchConcurrency {
+		return maxFetchConcurrency
+	}
+	return runner.FetchConcurrency
+}
+
+func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source, probeSlots chan struct{}) ([]string, bool, error) {
 	body, err := runner.Fetcher.Fetch(ctx, source)
 	if err != nil {
-		return nil, err
+		return nil, errors.Is(ctx.Err(), context.DeadlineExceeded), err
 	}
 	candidates, err := splitCandidates(body)
 	if err != nil {
-		return nil, err
+		return nil, errors.Is(ctx.Err(), context.DeadlineExceeded), err
 	}
 	screened := candidates
 	if runner.Prober != nil {
 		screened = selectProbeCandidates(candidates)
 	}
-	accepted, failures := runner.screenCandidates(ctx, candidates)
+	accepted, failures := runner.screenCandidates(ctx, candidates, probeSlots)
 	slog.Info("candidate screening summary", "component", "batch", "source_id", source.ID, "received_count", len(candidates), "eligible_count", len(screened), "unsupported_count", len(candidates)-len(screened), "accepted_count", len(accepted), "tcp_failed_count", failures["tcp_failed"], "proxy_http_failed_count", failures["proxy_http_failed"], "http_status_count", failures["http_status"], "invalid_count", failures["invalid"])
 	if len(accepted) == 0 {
-		return nil, errors.New("no candidates passed bounded TCP screening")
+		return nil, errors.Is(ctx.Err(), context.DeadlineExceeded), ErrNoScreenedCandidates
 	}
-	return accepted, nil
+	return accepted, errors.Is(ctx.Err(), context.DeadlineExceeded), nil
 }
 
-func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string) ([]string, map[string]int) {
+func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string, probeSlots chan struct{}) ([]string, map[string]int) {
 	if runner.Prober != nil {
 		candidates = selectProbeCandidates(candidates)
 	} else if len(candidates) > maxScreenedCandidates {
@@ -141,12 +229,18 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 					continue
 				}
 				{
+					select {
+					case probeSlots <- struct{}{}:
+					case <-ctx.Done():
+						return
+					}
 					probeContext, cancel := context.WithTimeout(ctx, 3*time.Second)
-					err = tcpReachable(probeContext, runner.Fetcher.Resolver, endpoint)
+					err = runner.tcpReachable(probeContext, endpoint)
 					if err == nil && runner.Prober != nil {
 						err = runner.Prober.Probe(probeContext, candidate)
 					}
 					cancel()
+					<-probeSlots
 					if err == nil {
 						select {
 						case accepted <- candidate:
@@ -197,6 +291,13 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 		}
 	}
 	return result, counts
+}
+
+func (runner BatchRunner) tcpReachable(ctx context.Context, endpoint string) error {
+	if runner.TCPChecker != nil {
+		return runner.TCPChecker(ctx, runner.Resolver, endpoint)
+	}
+	return tcpReachable(ctx, runner.Resolver, endpoint)
 }
 
 func selectProbeCandidates(candidates []string) []string {

@@ -15,6 +15,7 @@ const (
 )
 
 var ErrSourceNotFound = errors.New("source not found")
+var ErrNoScreenedCandidates = errors.New("no candidates passed bounded screening")
 
 type Source struct {
 	ID                  string
@@ -75,6 +76,8 @@ type Store interface {
 type RunOutcome string
 
 const (
-	RunSucceeded RunOutcome = "succeeded"
-	RunFailed    RunOutcome = "failed"
+	RunSucceeded   RunOutcome = "succeeded"
+	RunFailed      RunOutcome = "failed"
+	RunScreenedOut RunOutcome = "screened_out"
+	RunDeferred    RunOutcome = "deferred"
 )

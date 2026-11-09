@@ -49,6 +49,30 @@ func TestThirdFailedRunPausesSourceAndExplicitEnableRestoresIt(t *testing.T) {
 	}
 }
 
+func TestScreenedOutAndDeferredRunsDoNotPauseSource(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	registration := SourceRegistration{ID: "source-screening", FetchURL: "https://source.example/subscription", MinFetchInterval: time.Minute}
+	if err := store.RegisterSource(context.Background(), registration); err != nil {
+		t.Fatal(err)
+	}
+	for _, outcome := range []RunOutcome{RunScreenedOut, RunDeferred, RunScreenedOut} {
+		source, err := store.RecordRun(context.Background(), registration.ID, outcome, 0, "test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !source.Enabled || source.ConsecutiveFailures != 0 {
+			t.Fatalf("source after %s = %#v", outcome, source)
+		}
+	}
+}
+
 func TestPruneExpiredRemovesOnlyExpiredRecords(t *testing.T) {
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
 	if err != nil {

@@ -201,7 +201,7 @@ func nullablePauseReason(enabled bool, reason string) any {
 }
 
 func (store *SQLiteStore) RecordRun(ctx context.Context, sourceID string, outcome RunOutcome, candidateCount int, errorCode string) (Source, error) {
-	if outcome != RunSucceeded && outcome != RunFailed {
+	if outcome != RunSucceeded && outcome != RunFailed && outcome != RunScreenedOut && outcome != RunDeferred {
 		return Source{}, errors.New("invalid source run outcome")
 	}
 	if candidateCount < 0 {
@@ -227,13 +227,15 @@ func (store *SQLiteStore) RecordRun(ctx context.Context, sourceID string, outcom
 	if outcome == RunSucceeded {
 		failures = 0
 		_, err = tx.ExecContext(ctx, "UPDATE sources SET last_success_at=?, consecutive_failures=0, updated_at=? WHERE source_id=?", nowText, nowText, sourceID)
-	} else {
+	} else if outcome == RunFailed {
 		failures++
 		if failures >= FailurePauseLimit {
 			enabled = false
 			pauseReason = "consecutive_fetch_failures"
 		}
 		_, err = tx.ExecContext(ctx, "UPDATE sources SET last_failure_at=?, consecutive_failures=?, enabled=?, paused_reason=?, updated_at=? WHERE source_id=?", nowText, failures, enabled, pauseReason, nowText, sourceID)
+	} else {
+		_, err = tx.ExecContext(ctx, "UPDATE sources SET updated_at=? WHERE source_id=?", nowText, sourceID)
 	}
 	if err != nil {
 		return Source{}, err
