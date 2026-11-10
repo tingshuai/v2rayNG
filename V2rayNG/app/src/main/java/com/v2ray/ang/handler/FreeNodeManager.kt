@@ -36,6 +36,7 @@ object FreeNodeManager {
             ensureFingerprintMigration()
             MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_RISK_NOTICE_VERSION, AppConfig.FREE_NODE_RISK_NOTICE_VERSION)
             MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_ENABLED, true)
+            FreeNodeProbeScheduler.schedule(context)
         } catch (error: RuntimeException) {
             disable()
             throw error
@@ -52,6 +53,7 @@ object FreeNodeManager {
         MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_HISTORY, "")
         MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_RISK_NOTICE_VERSION, 0)
         SubscriptionUpdater.cancelOne(subId = AppConfig.FREE_NODE_SUBSCRIPTION_ID)
+        FreeNodeProbeScheduler.cancel()
         MmkvManager.removeSubscription(AppConfig.FREE_NODE_SUBSCRIPTION_ID)
     }
 
@@ -65,6 +67,27 @@ object FreeNodeManager {
             ?: FreeNodeHistoryState()
         val migrated = FreeNodeHistoryMigrator.migrate(previous, profiles, ::fingerprint)
         MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_HISTORY, JsonUtil.toJson(migrated))
+        if (isEnabled()) FreeNodeProbeScheduler.schedule()
+    }
+
+    fun probePlan(now: Long = System.currentTimeMillis()): Map<String, String> {
+        val profiles = MmkvManager.decodeServerList(AppConfig.FREE_NODE_SUBSCRIPTION_ID)
+            .mapNotNull { guid -> MmkvManager.decodeServerConfig(guid)?.let { profile -> fingerprint(profile) to guid } }
+            .toMap()
+        val state = loadHistory()
+        return FreeNodeScoring.plan(state, now).mapNotNull { fingerprint ->
+            profiles[fingerprint]?.let { guid -> fingerprint to guid }
+        }.toMap()
+    }
+
+    fun recordProbe(fingerprint: String, delayMillis: Long, now: Long = System.currentTimeMillis()) {
+        val previous = loadHistory()
+        val history = previous.entries[fingerprint] ?: return
+        val updated = previous.copy(
+            version = AppConfig.FREE_NODE_STATE_VERSION,
+            entries = previous.entries + (fingerprint to FreeNodeScoring.recordProbe(history, delayMillis, now)),
+        )
+        saveHistory(FreeNodeScoring.select(updated, now))
     }
 
     private fun ensurePolicyGroup(context: Context) {
@@ -91,6 +114,15 @@ object FreeNodeManager {
         if (MmkvManager.decodeSettingsInt(AppConfig.PREF_FREE_NODE_STATE_VERSION, 0) >= AppConfig.FREE_NODE_STATE_VERSION) return
         fingerprintKey()
         MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_STATE_VERSION, AppConfig.FREE_NODE_STATE_VERSION)
+    }
+
+    private fun loadHistory(): FreeNodeHistoryState =
+        MmkvManager.decodeSettingsString(AppConfig.PREF_FREE_NODE_HISTORY)
+            ?.let { JsonUtil.fromJsonSafe(it, FreeNodeHistoryState::class.java) }
+            ?: FreeNodeHistoryState()
+
+    private fun saveHistory(state: FreeNodeHistoryState) {
+        MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_HISTORY, JsonUtil.toJson(state))
     }
 
     private fun fingerprintKey(): ByteArray {

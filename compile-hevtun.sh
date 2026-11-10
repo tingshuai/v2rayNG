@@ -10,6 +10,12 @@ if [[ ! -d $NDK_HOME ]]; then
   echo "Android NDK: NDK_HOME not found. please set env \$NDK_HOME"
   exit 1
 fi
+# Windows NDK packages expose the build launcher as ndk-build.cmd; use it only
+# there so local Windows builds work until the NDK ships an extensionless launcher.
+NDK_BUILD="$NDK_HOME/ndk-build"
+if [[ ! -x $NDK_BUILD && -f "$NDK_BUILD.cmd" ]]; then
+    NDK_BUILD="$NDK_BUILD.cmd"
+fi
 TMPDIR=$(mktemp -d)
 clear_tmp () {
   rm -rf $TMPDIR
@@ -21,13 +27,35 @@ ABIS="armeabi-v7a arm64-v8a x86 x86_64"
 mkdir -p "$TMPDIR/jni"
 pushd "$TMPDIR"
 
-ln -s "$__dir/hev-socks5-tunnel" jni/hev-socks5-tunnel
+# Windows checkouts without Developer Mode materialize Git symlinks as small
+# text files. Copy and resolve them in the temporary build tree; keep real
+# symlinks on POSIX. Remove this fallback once Windows Git can create them.
+if [[ "$(git -C "$__dir/hev-socks5-tunnel" config --get core.symlinks)" == "true" && -L "$__dir/hev-socks5-tunnel/third-part/hev-task-system/include/hev-object-atomic.h" ]]; then
+    ln -s "$__dir/hev-socks5-tunnel" jni/hev-socks5-tunnel
+else
+    cp -a "$__dir/hev-socks5-tunnel" jni/hev-socks5-tunnel
+    pushd jni/hev-socks5-tunnel
+    source_root="$__dir/hev-socks5-tunnel"
+    {
+        printf '%s\n' "$source_root"
+        git -C "$source_root" submodule foreach --recursive --quiet 'pwd'
+    } | while IFS= read -r repository; do
+        relative_path="${repository#"$source_root"}"
+        relative_path="${relative_path#/}"
+        git -C "$repository" ls-files -s | awk -v prefix="$relative_path" '$1 == "120000" { print prefix == "" ? $4 : prefix "/" $4 }'
+    done | while IFS= read -r link; do
+        target="$(cat "$link")"
+        rm -f "$link"
+        cp -L "$(dirname "$link")/$target" "$link"
+    done
+    popd
+fi
 
 # 1) JNI shared library (libhev-socks5-tunnel.so) — loaded in-process by
 #    com.v2ray.ang.service.TProxyService for the VpnService hev tun mode.
 echo 'include $(call all-subdir-makefiles)' > jni/Android.mk
 
-"$NDK_HOME/ndk-build" \
+"$NDK_BUILD" \
     NDK_PROJECT_PATH=. \
     APP_BUILD_SCRIPT=jni/Android.mk \
     "APP_ABI=$ABIS" \
@@ -80,7 +108,7 @@ LOCAL_LDFLAGS += -Wl,-z,common-page-size=16384
 include $(BUILD_EXECUTABLE)
 EXECMK
 
-"$NDK_HOME/ndk-build" \
+"$NDK_BUILD" \
     NDK_PROJECT_PATH=. \
     APP_BUILD_SCRIPT=jni/exec.mk \
     "APP_ABI=$ABIS" \

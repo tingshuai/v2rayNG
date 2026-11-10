@@ -98,7 +98,7 @@ object AppConfig {
     const val PREF_FREE_NODE_STATE_VERSION = "pref_free_node_state_version"
     const val PREF_FREE_NODE_HISTORY = "pref_free_node_history"
     const val FREE_NODE_RISK_NOTICE_VERSION = 1
-    const val FREE_NODE_STATE_VERSION = 1
+    const val FREE_NODE_STATE_VERSION = 2
 
     /** Cache keys. */
     const val CACHE_SUBSCRIPTION_ID = "cache_subscription_id"
