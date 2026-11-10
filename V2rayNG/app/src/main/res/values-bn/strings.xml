@@ -565,4 +565,13 @@
     <string name="sub_info_open_page">সাবস্ক্রিপশন তথ্যের পাতা খুলুন</string>
     <string name="sub_info_unlimited">সীমাহীন</string>
 
+    <string name="free_node_settings_title">বিনামূল্যের নোড</string>
+    <string name="free_node_enable_title">বিনামূল্যের নোড প্রার্থী ব্যবহার করুন</string>
+    <string name="free_node_enable_summary">ঝুঁকি গ্রহণের পরে আলাদা প্রার্থী সাবস্ক্রিপশন আমদানি করুন।</string>
+    <string name="free_node_risk_title">বিনামূল্যের নোড গোপনীয়তা সতর্কতা</string>
+    <string name="free_node_risk_message">বিনামূল্যের নোড বিশ্বাসযোগ্য নয়। পাসওয়ার্ড, পেমেন্ট বা অন্য সংবেদনশীল ট্র্যাফিক এর মাধ্যমে পাঠাবেন না।</string>
+    <string name="free_node_enable_confirm">আমি বুঝি এবং চালু করি</string>
+    <string name="free_node_enable_failed">বিনামূল্যের নোড চালু করা যায়নি।</string>
+    <string name="free_node_subscription_name">বিনামূল্যের নোড প্রার্থী</string>
+    <string name="free_node_policy_group_name">বিনামূল্যের নোড স্বয়ংক্রিয় নির্বাচন</string>
 </resources>

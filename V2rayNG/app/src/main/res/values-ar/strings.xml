@@ -573,4 +573,13 @@
     <string name="sub_info_open_page">فتح صفحة معلومات الاشتراك</string>
     <string name="sub_info_unlimited">غير محدود</string>
 
+    <string name="free_node_settings_title">العُقد المجانية</string>
+    <string name="free_node_enable_title">استخدام مرشحي العُقد المجانية</string>
+    <string name="free_node_enable_summary">استيراد اشتراك مرشحين مخصص بعد قبول المخاطر.</string>
+    <string name="free_node_risk_title">تحذير خصوصية للعُقد المجانية</string>
+    <string name="free_node_risk_message">العُقد المجانية غير موثوقة. لا ترسل كلمات المرور أو المدفوعات أو أي حركة حساسة عبرها.</string>
+    <string name="free_node_enable_confirm">أفهم وأفعّل</string>
+    <string name="free_node_enable_failed">تعذر تفعيل العُقد المجانية.</string>
+    <string name="free_node_subscription_name">مرشحو العُقد المجانية</string>
+    <string name="free_node_policy_group_name">اختيار العُقد المجانية تلقائياً</string>
 </resources>

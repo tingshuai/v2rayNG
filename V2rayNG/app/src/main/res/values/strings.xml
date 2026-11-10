@@ -566,4 +566,13 @@
     <string name="sub_info_traffic" translatable="false">%1$s / %2$s</string>
     <string name="sub_info_unlimited">Unlimited</string>
 
+    <string name="free_node_settings_title">Free nodes</string>
+    <string name="free_node_enable_title">Use free-node candidates</string>
+    <string name="free_node_enable_summary">Import a dedicated candidate subscription after you accept the risks.</string>
+    <string name="free_node_risk_title">Free-node privacy warning</string>
+    <string name="free_node_risk_message">Free nodes are untrusted. Do not send passwords, payments, or other sensitive traffic through them.</string>
+    <string name="free_node_enable_confirm">I understand and enable</string>
+    <string name="free_node_enable_failed">Unable to enable free nodes.</string>
+    <string name="free_node_subscription_name">Free-node candidates</string>
+    <string name="free_node_policy_group_name">Free-node automatic selection</string>
 </resources>

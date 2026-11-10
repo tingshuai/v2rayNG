@@ -236,6 +236,10 @@ object SettingsManager {
      * it creates a new default subscription to ensure that ungroup
      **/
     fun removeSubscriptionWithDefault(subid: String) {
+        if (FreeNodeManager.isDedicatedSubscription(subid)) {
+            FreeNodeManager.disable()
+            return
+        }
         SubscriptionUpdater.cancelOne(subId = subid)
         // Remove the subscription
         removeSubscription(subid)

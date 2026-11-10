@@ -566,4 +566,13 @@
     <string name="sub_info_traffic" translatable="false">%1$s / %2$s</string>
     <string name="sub_info_unlimited">Limitsiz</string>
 
+    <string name="free_node_settings_title">Pulsuz qovşaqlar</string>
+    <string name="free_node_enable_title">Pulsuz qovşaq namizədlərindən istifadə et</string>
+    <string name="free_node_enable_summary">Riskləri qəbul etdikdən sonra ayrıca namizəd abunəliyini idxal edin.</string>
+    <string name="free_node_risk_title">Pulsuz qovşaq məxfilik xəbərdarlığı</string>
+    <string name="free_node_risk_message">Pulsuz qovşaqlar etibarlı deyil. Parol, ödəniş və ya digər həssas trafiki onlardan keçirməyin.</string>
+    <string name="free_node_enable_confirm">Başa düşürəm və aktivləşdirirəm</string>
+    <string name="free_node_enable_failed">Pulsuz qovşaqları aktivləşdirmək mümkün olmadı.</string>
+    <string name="free_node_subscription_name">Pulsuz qovşaq namizədləri</string>
+    <string name="free_node_policy_group_name">Pulsuz qovşağın avtomatik seçimi</string>
 </resources>

@@ -563,4 +563,13 @@
     <string name="sub_info_open_page">Mở trang thông tin đăng ký</string>
     <string name="sub_info_unlimited">Không giới hạn</string>
 
+    <string name="free_node_settings_title">Nút miễn phí</string>
+    <string name="free_node_enable_title">Dùng các nút miễn phí</string>
+    <string name="free_node_enable_summary">Nhập gói ứng viên riêng sau khi bạn chấp nhận rủi ro.</string>
+    <string name="free_node_risk_title">Cảnh báo riêng tư về nút miễn phí</string>
+    <string name="free_node_risk_message">Nút miễn phí không đáng tin cậy. Không gửi mật khẩu, thanh toán hoặc lưu lượng nhạy cảm khác qua chúng.</string>
+    <string name="free_node_enable_confirm">Tôi hiểu và bật</string>
+    <string name="free_node_enable_failed">Không thể bật nút miễn phí.</string>
+    <string name="free_node_subscription_name">Ứng viên nút miễn phí</string>
+    <string name="free_node_policy_group_name">Chọn tự động nút miễn phí</string>
 </resources>

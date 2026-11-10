@@ -187,6 +187,12 @@ object MmkvManager {
         }
     }
 
+    fun clearSelectServer() {
+        withProfileIndexLock {
+            mainStorage.remove(KEY_SELECTED_SERVER)
+        }
+    }
+
     /**
      * Encodes the server list for a given subscription.
      * Saves to the subscription's serverList (including default subscription for ungrouped servers).

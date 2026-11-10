@@ -202,6 +202,19 @@ This fork adds an opt-in free-node capability to v2rayNG. Its goal is to provide
 candidate feed and make choices using the user's real network. Preserve v2rayNG's existing client
 behavior for every user who does not opt in.
 
+## Local tooling storage
+
+- Downloads and installations made for agent work, including tools, software, model files, plugins,
+  SDKs, caches, and temporary installation artifacts, must default to
+  `D:\CodexData\CodexDownloads`. Do not place them under the system drive unless a tool cannot be
+  configured otherwise or Windows itself requires that location; report that exception before using it.
+
+## Autonomous communication
+
+- After the user authorizes implementation, proceed through all in-scope work without interrupting
+  them for nonessential progress reports or phase details. Report only completion, a true blocker,
+  or a decision that requires the user's authority.
+
 - `origin` is `https://github.com/tingshuai/v2rayNG.git`; `upstream` is
   `https://github.com/2dust/v2rayNG.git`. `upstream/master` is the core baseline. Do not replace,
   rebase, or force-push `master`; use focused `codex/` branches and explicit merges or PRs.

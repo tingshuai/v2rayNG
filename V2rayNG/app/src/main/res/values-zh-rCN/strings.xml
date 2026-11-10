@@ -563,4 +563,13 @@
     <string name="sub_info_open_page">打开订阅信息页面</string>
     <string name="sub_info_unlimited">无限制</string>
 
+    <string name="free_node_settings_title">免费节点</string>
+    <string name="free_node_enable_title">使用免费节点候选</string>
+    <string name="free_node_enable_summary">接受风险后导入专用候选订阅。</string>
+    <string name="free_node_risk_title">免费节点隐私警告</string>
+    <string name="free_node_risk_message">免费节点不可信。请勿通过它们发送密码、付款信息或其他敏感流量。</string>
+    <string name="free_node_enable_confirm">我已了解并启用</string>
+    <string name="free_node_enable_failed">无法启用免费节点。</string>
+    <string name="free_node_subscription_name">免费节点候选</string>
+    <string name="free_node_policy_group_name">免费节点自动选择</string>
 </resources>

@@ -565,4 +565,13 @@
     <string name="sub_info_open_page">واز کردن صفحه اطلاعات اشتراک</string>
     <string name="sub_info_unlimited">بی‌حد</string>
 
+    <string name="free_node_settings_title">گره‌های رایگان</string>
+    <string name="free_node_enable_title">استفاده از نامزدهای گرهٔ رایگان</string>
+    <string name="free_node_enable_summary">پس از پذیرش خطرات، اشتراک نامزدهای اختصاصی را وارد کنید.</string>
+    <string name="free_node_risk_title">هشدار حریم خصوصی گرهٔ رایگان</string>
+    <string name="free_node_risk_message">گره‌های رایگان قابل اعتماد نیستند. گذرواژه، پرداخت یا ترافیک حساس دیگر را از آن‌ها عبور ندهید.</string>
+    <string name="free_node_enable_confirm">می‌دانم و فعال می‌کنم</string>
+    <string name="free_node_enable_failed">فعال‌سازی گره‌های رایگان انجام نشد.</string>
+    <string name="free_node_subscription_name">نامزدهای گرهٔ رایگان</string>
+    <string name="free_node_policy_group_name">انتخاب خودکار گرهٔ رایگان</string>
 </resources>

@@ -313,6 +313,9 @@ object AngConfigManager {
             subscriptionId = subid,
             append = append,
         )
+        if (!append && FreeNodeManager.isDedicatedSubscription(subid)) {
+            FreeNodeManager.migrateHistory(keyToProfile.values)
+        }
     }
 
     /**

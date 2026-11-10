@@ -5,6 +5,9 @@ import android.content.Intent
 import android.provider.Settings
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
+import com.v2ray.ang.handler.AngConfigManager
+import com.v2ray.ang.handler.FreeNodeManager
+import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.root.RootManager
 import com.v2ray.ang.ui.base.BaseViewModel
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +19,35 @@ class SettingsViewModel(application: Application) : BaseViewModel(application) {
 
     private val _systemVpnSettingsAvailable = MutableStateFlow(false)
     val systemVpnSettingsAvailable = _systemVpnSettingsAvailable.asStateFlow()
+    private val _freeNodesEnabled = MutableStateFlow(FreeNodeManager.isEnabled())
+    val freeNodesEnabled = _freeNodesEnabled.asStateFlow()
+
+    fun enableFreeNodes() {
+        launchLoading {
+            try {
+                withContext(Dispatchers.IO) {
+                    FreeNodeManager.enable(getApplication())
+                    val subscription = MmkvManager.decodeSubscriptions()
+                        .first { FreeNodeManager.isDedicatedSubscription(it.guid) }
+                    check(AngConfigManager.updateConfigViaSub(subscription).successCount == 1) {
+                        "free-node subscription update failed"
+                    }
+                }
+                _freeNodesEnabled.value = true
+            } catch (error: RuntimeException) {
+                withContext(Dispatchers.IO) { FreeNodeManager.disable() }
+                _freeNodesEnabled.value = false
+                toastError(R.string.free_node_enable_failed)
+            }
+        }
+    }
+
+    fun disableFreeNodes() {
+        launchLoading {
+            withContext(Dispatchers.IO) { FreeNodeManager.disable() }
+            _freeNodesEnabled.value = false
+        }
+    }
 
     suspend fun refreshSystemVpnSettingsAvailability() {
         _systemVpnSettingsAvailable.value = withContext(Dispatchers.IO) {

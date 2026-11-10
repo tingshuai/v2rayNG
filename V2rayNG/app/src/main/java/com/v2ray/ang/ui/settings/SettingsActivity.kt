@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -105,7 +108,10 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val systemVpnSettingsAvailable by viewModel.systemVpnSettingsAvailable.collectAsStateWithLifecycle()
+    val freeNodesEnabled by viewModel.freeNodesEnabled.collectAsStateWithLifecycle()
+    var showFreeNodeRiskDialog by rememberSaveable { mutableStateOf(false) }
     var uiSettingsExpanded by rememberSaveable { mutableStateOf(true) }
+    var freeNodeSettingsExpanded by rememberSaveable { mutableStateOf(true) }
     var vpnSettingsExpanded by rememberSaveable { mutableStateOf(true) }
     var coreSettingsExpanded by rememberSaveable { mutableStateOf(true) }
     var muxSettingsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -218,6 +224,25 @@ fun SettingsScreen(
     val modeEntries = stringArrayResource(R.array.mode_entries).toList()
     val modeValues = stringArrayResource(R.array.mode_value).toList()
 
+    if (showFreeNodeRiskDialog) {
+        AlertDialog(
+            onDismissRequest = { showFreeNodeRiskDialog = false },
+            title = { Text(stringResource(R.string.free_node_risk_title)) },
+            text = { Text(stringResource(R.string.free_node_risk_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showFreeNodeRiskDialog = false
+                    viewModel.enableFreeNodes()
+                }) { Text(stringResource(R.string.free_node_enable_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFreeNodeRiskDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
@@ -235,6 +260,21 @@ fun SettingsScreen(
                 .verticalScrollbar(scrollState)
                 .verticalScroll(scrollState)
         ) {
+            CollapsiblePreferenceGroupHeader(
+                title = stringResource(R.string.free_node_settings_title),
+                expanded = freeNodeSettingsExpanded,
+                onExpandedChange = { freeNodeSettingsExpanded = it },
+            )
+            if (freeNodeSettingsExpanded) {
+                SettingsSwitchItem(
+                    title = stringResource(R.string.free_node_enable_title),
+                    summary = stringResource(R.string.free_node_enable_summary),
+                    checked = freeNodesEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled) showFreeNodeRiskDialog = true else viewModel.disableFreeNodes()
+                    },
+                )
+            }
             CollapsiblePreferenceGroupHeader(
                 title = stringResource(R.string.title_ui_settings),
                 expanded = uiSettingsExpanded,
