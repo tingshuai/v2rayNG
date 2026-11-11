@@ -14,6 +14,7 @@
 - [来源审查记录](source-review.md)：接入、弃用和重新评估来源的可复核决定。
 - [数据保留与威胁模型](threat-model.md)：风险、隐私和日志规则。
 - [Android 状态与选择设计](android-selection.md)：客户端测试、排序、隔离和切换逻辑。
+- [P4 端到端试运行记录](p4-end-to-end-trial.md)：阶段试运行证据、范围与待满足前置条件。
 - [上游同步清单](upstream-sync-checklist.md)：同步 v2rayNG 上游时的检查步骤。
 
 ## 维护原则
