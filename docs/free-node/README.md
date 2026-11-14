@@ -1,20 +1,20 @@
 # 免费节点功能文档
 
-本目录记录 FreeV2ray 的免费节点功能设计、接口和运行要求。免费节点功能始终为用户主动开启的可选能力；未开启的用户保持原有 v2rayNG 行为。
+本目录记录 FreeV2ray 的免费节点功能设计、接口和运行要求。**现行目标设计版本为 `FN-2.0`，目前只完成文档，代码和部署仍是旧实现。** 免费节点功能由用户主动开启；启用后匿名质量反馈默认开启，可单独关闭。未开启用户保持原有 v2rayNG 行为。
 
 ## 文档导航
 
-- [实施路径](implementation-plan.md)：用通俗语言说明端到端流程与分期交付。
+- [FN-2.0 实施方案](implementation-plan.md)：目标行为、直接替换顺序与验收。
 - [开发节奏与验收](development-roadmap.md)：阶段、依赖、交付物和完成标准。
 - [部署与技术栈](deployment-architecture.md)：首版基础设施、组件边界和扩容条件。
-- [P0 设计冻结](p0-design-freeze.md)：已确认的来源、保留期、迁移草案和测试夹具契约。
-- [P0 测试夹具](fixtures/README.md)：不含节点配置或秘密的确定性输入与预期结果。
+- [FN-2.0 设计决定](p0-design-freeze.md)：来源、候选状态、分发和反馈的边界。
+- [FN-2.0 测试夹具](fixtures/README.md)：不含节点配置或秘密的确定性场景。
 - [订阅与元数据契约](feed-schema.md)：服务端对客户端的稳定输出约定。
 - [采集服务运行手册](collector-runbook.md)：独立采集服务的边界、检查及应急处理。
 - [来源审查记录](source-review.md)：接入、弃用和重新评估来源的可复核决定。
 - [数据保留与威胁模型](threat-model.md)：风险、隐私和日志规则。
 - [Android 状态与选择设计](android-selection.md)：客户端测试、排序、隔离和切换逻辑。
-- [P4 端到端试运行记录](p4-end-to-end-trial.md)：阶段试运行证据、范围与待满足前置条件。
+- [旧方案试运行记录](p4-end-to-end-trial.md)：历史证据，不代表 FN-2.0 已验收。
 - [上游同步清单](upstream-sync-checklist.md)：同步 v2rayNG 上游时的检查步骤。
 
 ## 维护原则

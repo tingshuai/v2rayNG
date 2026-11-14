@@ -1,33 +1,25 @@
-# P0 测试夹具
+# FN-2.0 确定性测试夹具清单
 
-这些夹具定义 P1/P2 必须实现的确定性测试，不保存完整代理链接、UUID、私钥、凭据、生产来源或用户数据。需要协议解析的实现测试应在各自代码库中通过安全的测试工厂构造临时输入，测试结束即销毁；不得将可导入节点样本提交到本仓库。
+本清单定义目标行为，尚未实现。夹具不得保存生产来源、完整代理链接、UUID、私钥、凭据或用户数据；需要协议输入时由测试工厂临时生成并销毁。
 
-## 服务端来源与安全夹具
-
-| ID | 输入概述 | 预期结果 |
+| ID | 场景 | 预期 |
 | --- | --- | --- |
-| `source-public-unauthenticated` | 公开、无需认证的 HTTPS 来源 | 可登记为启用来源 |
-| `source-auth-required` | 要求登录、Cookie、验证码或令牌的来源 | 拒绝登记，审计不含认证材料 |
-| `source-third-fetch-failure` | 同一来源连续三次超时/失败 | 第三次后暂停，已有有效输出不被覆盖 |
-| `source-explicit-reenable` | 已暂停来源的显式启用操作 | 仅在全量校验通过后恢复；定时任务不恢复 |
-| `target-loopback` | DNS 解析至回环地址 | 在连接前拒绝 |
-| `target-private` | DNS 解析至私网、链路本地或保留地址 | 在连接前拒绝 |
-| `target-rebind` | 首次解析为公网、连接前解析为非公网 | 连接前拒绝 |
-| `output-failed-batch` | 新批次任一发布前置检查失败 | 保留最后有效订阅 |
-| `retention-expiry` | 各类记录恰好到达保留期限 | 按 P0 保留期删除；不删当前有效输出 |
+| source-different-cadence | 两来源更新周期不同 | 各自到期获取，候选合并，慢来源不会被快来源更新覆盖 |
+| source-fetch-failure | 来源拉取失败 | 不将其旧节点标记为消失 |
+| source-missing-node | 节点从一个来源缺席、仍在另一来源出现 | 保留节点及来源关联 |
+| source-all-missing | 所有关联来源成功更新且节点持续缺席 | 达到保留期后过期 |
+| duplicate-across-sources | 相同连接字段出现在多个来源 | 一个指纹、一次完整探测 |
+| source-long-list-rotation | 来源长期返回稳定长列表 | 每轮位置推进，尾部节点最终获得测试机会 |
+| failed-probe-cooldown | 节点连续失败 | 隔离期间不重测，到期有限复测 |
+| unsafe-revocation | 配置或地址安全违规 | 立即停发并产生撤销信号 |
+| weighted-distribution | 质量与分配压力不同 | 好节点有更多机会，集中度有上限，新节点仍获份额 |
+| publish-empty | 新发布为空或中途失败 | 保留最后有效清单与回退副本 |
+| client-merge | 新清单缺少本机近期有效节点 | 保留旧节点并继承历史 |
+| client-failure | 本机网络正常但某节点重复失败 | 退出可选集合，暂留失败指纹 |
+| incumbent-stable | 当前节点健康、挑战者单次更快 | 不切换 |
+| feedback-disabled | 用户关闭反馈 | 不发送报告，清单与选路继续工作 |
+| feedback-single-failure | 一份匿名失败报告 | 最多降权/安排复测，不全局删除 |
+| feedback-privacy | 反馈与日志审计 | 无配置、凭据、UUID、设备 ID、IP 或测试载荷 |
+| data-expiry | 各类数据到达保留期限 | 删除过期数据且不删当前有效发布 |
 
-## 客户端确定性夹具清单
-
-| ID | 初始状态与事件 | 预期结果 |
-| --- | --- | --- |
-| `fingerprint-replacement` | 相同连接相关字段、不同订阅 GUID/位置 | 关联同一历史状态 |
-| `fingerprint-secret-change` | 连接认证材料变化 | 生成不同指纹，不继承旧状态 |
-| `migration-previous-format` | 读取上一发布格式的本地状态 | 迁移后可读取且不丢失有效历史 |
-| `single-failure` | 健康当前节点一次探测失败 | 不切换、不删除 |
-| `single-latency-win` | 挑战者单次延迟较低 | 不抢占健康当前节点 |
-| `repeated-advantage` | 挑战者重复测量且持续显著更优 | 仅达到阈值后切换 |
-| `failure-isolation` | 达到连续失败阈值 | 隔离至 TTL；TTL 前不参与常规抽样 |
-| `isolation-recovery-sample` | TTL 到期 | 仅作为有限恢复样本测试 |
-| `subscription-replacement` | 新候选、历史重关联、过期清理中途失败 | 恢复或移除部分写入，保持一致状态 |
-
-客户端夹具是 P2/P3 的测试清单，不表示这些功能在 P0 已实现。
+实现测试须覆盖日期边界、并发、事务失败恢复、网络/电量约束和 VPN、仅代理、root 受影响路径。
