@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -36,6 +38,18 @@ func (store *recordingStore) RecordPublication(context.Context, []string, Publis
 func (store *recordingStore) EnabledSources(context.Context) ([]Source, error) {
 	return store.sources, nil
 }
+func (store *recordingStore) ScreeningCursor(context.Context, string) (int, error)      { return 0, nil }
+func (store *recordingStore) AdvanceScreeningCursor(context.Context, string, int) error { return nil }
+func (store *recordingStore) CandidateProbeDue(context.Context, string, time.Time) (bool, error) {
+	return true, nil
+}
+func (store *recordingStore) RecordCandidateProbe(context.Context, string, bool, time.Time) error {
+	return nil
+}
+func (store *recordingStore) CandidateQuality(context.Context, []string) (map[string]CandidateQuality, error) {
+	return map[string]CandidateQuality{}, nil
+}
+func (store *recordingStore) RecordCandidateAssignments(context.Context, []string) error { return nil }
 func (store *recordingStore) PruneExpired(context.Context, time.Time) error {
 	store.pruned = true
 	return store.pruneErr
@@ -139,9 +153,46 @@ func TestEffectiveFetchConcurrencyIsBounded(t *testing.T) {
 	}
 }
 
+func TestRotateCandidatesAdvancesThroughLongSourceAndWraps(t *testing.T) {
+	candidates := []string{"a", "b", "c", "d", "e"}
+	first, cursor := rotateCandidates(candidates, 0, 2)
+	if strings.Join(first, "") != "ab" || cursor != 2 {
+		t.Fatalf("first selection = %v, cursor = %d", first, cursor)
+	}
+	second, cursor := rotateCandidates(candidates, cursor, 2)
+	if strings.Join(second, "") != "cd" || cursor != 4 {
+		t.Fatalf("second selection = %v, cursor = %d", second, cursor)
+	}
+	third, cursor := rotateCandidates(candidates, cursor, 2)
+	if strings.Join(third, "") != "ea" || cursor != 1 {
+		t.Fatalf("third selection = %v, cursor = %d", third, cursor)
+	}
+}
+
+func TestAllocateSourceBudgetsSharesBatchBudgetAcrossSources(t *testing.T) {
+	sources := []Source{{ID: "one"}, {ID: "two"}, {ID: "three"}}
+	budgets := allocateSourceBudgets(sources, time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC))
+	total, minBudget, maxBudget := 0, maxScreenedCandidates, 0
+	for _, source := range sources {
+		budget := budgets[source.ID]
+		total += budget
+		minBudget = min(minBudget, budget)
+		maxBudget = max(maxBudget, budget)
+	}
+	if total != maxScreenedCandidates || maxBudget-minBudget > 1 {
+		t.Fatalf("source budgets = %#v (total %d), want balanced total %d", budgets, total, maxScreenedCandidates)
+	}
+}
+
 type fixedFetcher struct{ body []byte }
 
 func (fetcher fixedFetcher) Fetch(context.Context, Source) ([]byte, error) { return fetcher.body, nil }
+
+type sourceFetcherFunc func(context.Context, Source) ([]byte, error)
+
+func (fetcher sourceFetcherFunc) Fetch(ctx context.Context, source Source) ([]byte, error) {
+	return fetcher(ctx, source)
+}
 
 type successfulProber struct{}
 
@@ -197,7 +248,9 @@ func TestScreenSourcesSharesGlobalProbeConcurrency(t *testing.T) {
 	release := make(chan struct{})
 	var inFlight, peak int32
 	runner := BatchRunner{
-		Fetcher:          fixedFetcher{body: []byte("trojan://credential@node.example:443")},
+		Fetcher: sourceFetcherFunc(func(_ context.Context, source Source) ([]byte, error) {
+			return []byte("trojan://credential@" + source.ID + ".example:443"), nil
+		}),
 		FetchConcurrency: 3,
 		TCPConcurrency:   maxTCPConcurrency,
 		Prober:           successfulProber{},
@@ -235,5 +288,31 @@ func TestScreenSourcesSharesGlobalProbeConcurrency(t *testing.T) {
 	}
 	if count != 3 {
 		t.Fatalf("screened source count = %d, want 3", count)
+	}
+}
+
+func TestScreenSourcesUsesOneSharedBatchProbeBudget(t *testing.T) {
+	var checks atomic.Int32
+	runner := BatchRunner{
+		Fetcher: sourceFetcherFunc(func(_ context.Context, source Source) ([]byte, error) {
+			candidates := make([]string, 30)
+			for index := range candidates {
+				candidates[index] = fmt.Sprintf("trojan://credential@%s-node-%d.example:443", source.ID, index)
+			}
+			return []byte(strings.Join(candidates, "\n")), nil
+		}),
+		FetchConcurrency: 3,
+		TCPConcurrency:   maxTCPConcurrency,
+		Prober:           successfulProber{},
+		TCPChecker: func(context.Context, Resolver, string) error {
+			checks.Add(1)
+			return nil
+		},
+	}
+	results := runner.screenSources(context.Background(), []Source{{ID: "one"}, {ID: "two"}, {ID: "three"}})
+	for range results {
+	}
+	if got := checks.Load(); got != maxScreenedCandidates {
+		t.Fatalf("batch probe count = %d, want global budget %d", got, maxScreenedCandidates)
 	}
 }

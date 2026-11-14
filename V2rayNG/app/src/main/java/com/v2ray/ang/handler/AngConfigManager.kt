@@ -307,6 +307,12 @@ object AngConfigManager {
             parsed.rawConfig?.let { raw -> rawConfigs[key] = raw }
         }
 
+        if (!append && FreeNodeManager.isDedicatedSubscription(subid)) {
+            FreeNodeManager.retainRecentlyValidatedProfiles(keyToProfile.values).forEach { profile ->
+                keyToProfile[Utils.getUuid()] = profile.copy()
+            }
+        }
+
         MmkvManager.saveServerProfiles(
             profiles = keyToProfile,
             rawConfigs = rawConfigs,

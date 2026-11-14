@@ -71,6 +71,12 @@ type Store interface {
 	RecordRun(ctx context.Context, sourceID string, outcome RunOutcome, candidateCount int, errorCode string) (Source, error)
 	RecordPublication(ctx context.Context, fingerprints []string, snapshot PublishedSnapshot) error
 	EnabledSources(ctx context.Context) ([]Source, error)
+	ScreeningCursor(ctx context.Context, sourceID string) (int, error)
+	AdvanceScreeningCursor(ctx context.Context, sourceID string, offset int) error
+	CandidateProbeDue(ctx context.Context, fingerprint string, now time.Time) (bool, error)
+	RecordCandidateProbe(ctx context.Context, fingerprint string, succeeded bool, now time.Time) error
+	CandidateQuality(ctx context.Context, fingerprints []string) (map[string]CandidateQuality, error)
+	RecordCandidateAssignments(ctx context.Context, fingerprints []string) error
 	PruneExpired(ctx context.Context, now time.Time) error
 }
 

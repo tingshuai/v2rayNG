@@ -49,6 +49,79 @@ func TestThirdFailedRunPausesSourceAndExplicitEnableRestoresIt(t *testing.T) {
 	}
 }
 
+func TestSourceScreeningCursorPersistsAcrossStoreReopen(t *testing.T) {
+	database := filepath.Join(t.TempDir(), "collector.sqlite")
+	store, err := OpenSQLite(database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	registration := SourceRegistration{ID: "source-cursor", FetchURL: "https://source.example/subscription", MinFetchInterval: time.Minute}
+	if err := store.RegisterSource(context.Background(), registration); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AdvanceScreeningCursor(context.Background(), registration.ID, 42); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = OpenSQLite(database)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	offset, err := store.ScreeningCursor(context.Background(), registration.ID)
+	if err != nil || offset != 42 {
+		t.Fatalf("cursor = %d, error = %v; want 42", offset, err)
+	}
+}
+
+func TestCandidateProbeStateAppliesCooldownAndRepeatedFailureIsolation(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	due, err := store.CandidateProbeDue(context.Background(), "candidate", now)
+	if err != nil || !due {
+		t.Fatalf("new candidate due=%v err=%v", due, err)
+	}
+	for index := range 3 {
+		if err := store.RecordCandidateProbe(context.Background(), "candidate", false, now.Add(time.Duration(index)*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	due, err = store.CandidateProbeDue(context.Background(), "candidate", now.Add(2*time.Hour+probeCooldown-time.Second))
+	if err != nil || due {
+		t.Fatalf("isolated candidate due=%v err=%v before TTL", due, err)
+	}
+	due, err = store.CandidateProbeDue(context.Background(), "candidate", now.Add(2*time.Hour+probeCooldown))
+	if err != nil || !due {
+		t.Fatalf("isolated candidate due=%v err=%v at TTL", due, err)
+	}
+	if err := store.RecordCandidateProbe(context.Background(), "candidate", true, now.Add(2*time.Hour+probeCooldown)); err != nil {
+		t.Fatal(err)
+	}
+	due, err = store.CandidateProbeDue(context.Background(), "candidate", now.Add(2*time.Hour+probeCooldown+healthyRecheck-time.Second))
+	if err != nil || due {
+		t.Fatalf("healthy candidate due=%v err=%v before recheck interval", due, err)
+	}
+	due, err = store.CandidateProbeDue(context.Background(), "candidate", now.Add(2*time.Hour+probeCooldown+healthyRecheck))
+	if err != nil || !due {
+		t.Fatalf("healthy candidate due=%v err=%v at recheck interval", due, err)
+	}
+}
+
 func TestScreenedOutAndDeferredRunsDoNotPauseSource(t *testing.T) {
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
 	if err != nil {
@@ -99,8 +172,43 @@ func TestRecordPublicationStoresOnlyFingerprintsAndSnapshotMetadata(t *testing.T
 	if err := store.db.QueryRow("SELECT success_count FROM candidate_fingerprints WHERE fingerprint='fingerprint-one'").Scan(&successes); err != nil {
 		t.Fatal(err)
 	}
-	if fingerprints != 2 || snapshots != 2 || successes != 2 {
-		t.Fatalf("fingerprints=%d snapshots=%d successes=%d", fingerprints, snapshots, successes)
+	if fingerprints != 2 || snapshots != 2 || successes != 0 {
+		t.Fatalf("fingerprints=%d snapshots=%d successful_probes=%d", fingerprints, snapshots, successes)
+	}
+}
+
+func TestCandidateQualityAndAssignmentPressureAreAggregated(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := store.RecordCandidateProbe(context.Background(), "candidate-good", true, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordCandidateProbe(context.Background(), "candidate-good", true, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordCandidateProbe(context.Background(), "candidate-good", false, now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordCandidateAssignments(context.Background(), []string{"candidate-good", "candidate-good"}); err != nil {
+		t.Fatal(err)
+	}
+	qualities, err := store.CandidateQuality(context.Background(), []string{"candidate-good", "candidate-missing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	quality := qualities["candidate-good"]
+	if quality.SuccessCount != 2 || quality.FailureCount != 1 || quality.ConsecutiveFails != 1 || quality.AssignmentCount != 2 || quality.LastSuccessAt == nil {
+		t.Fatalf("candidate quality = %#v", quality)
+	}
+	if _, exists := qualities["candidate-missing"]; exists {
+		t.Fatal("missing candidate unexpectedly had persisted quality")
 	}
 }
 

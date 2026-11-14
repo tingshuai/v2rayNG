@@ -14,7 +14,7 @@ go run ./cmd/collector source update -database ./data/collector.sqlite -id examp
 go run ./cmd/collector source pause -database ./data/collector.sqlite -id example -reason operator_request
 go run ./cmd/collector source delete -database ./data/collector.sqlite -id example -reason operator_request
 go run ./cmd/collector run -database ./data/collector.sqlite -work-dir ./data -fingerprint-key-file /run/secrets/collector_fingerprint_key -sing-box-path /usr/local/bin/sing-box
-go run ./cmd/collector serve -database ./data/collector.sqlite -work-dir ./data -listen 127.0.0.1:8080
+go run ./cmd/collector serve -database ./data/collector.sqlite -work-dir ./data -listen 127.0.0.1:8080 -fingerprint-key-file /run/secrets/collector_fingerprint_key
 ```
 
 `deploy/compose.yaml` runs only the read-only subscription server. The bounded batch runner is deliberately separate: install the `deploy/systemd/collector-run.{service,timer}` units and set `COLLECTOR_FINGERPRINT_KEY_FILE` in `/etc/freev2ray/collector.env` from the supplied example. The timer invokes `compose.runner.yaml`, which mounts the key as a Docker secret only for that one-shot container. Install the paired health-check timer; `/healthz` returns success only while the current subscription file is newer than its configured maximum age, and its systemd failure hook invokes the optional local alert command.

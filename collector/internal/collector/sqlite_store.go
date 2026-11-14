@@ -16,8 +16,11 @@ import (
 )
 
 const (
-	auditRetention = 180 * 24 * time.Hour
+	auditRetention = 30 * 24 * time.Hour
 	runRetention   = 30 * 24 * time.Hour
+	probeCooldown  = 30 * time.Minute
+	healthyRecheck = 6 * time.Hour
+	isolationTime  = 30 * time.Minute
 )
 
 type SQLiteStore struct{ db *sql.DB }
@@ -265,7 +268,7 @@ func (store *SQLiteStore) RecordPublication(ctx context.Context, fingerprints []
 	defer tx.Rollback()
 	publishedAt := snapshot.PublishedAt.UTC().Format(time.RFC3339Nano)
 	for _, value := range fingerprints {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_fingerprints(fingerprint, first_seen_at, last_seen_at, success_count, failure_count) VALUES(?, ?, ?, 1, 0) ON CONFLICT(fingerprint) DO UPDATE SET last_seen_at=excluded.last_seen_at, success_count=candidate_fingerprints.success_count + 1`, value, publishedAt, publishedAt); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_fingerprints(fingerprint, first_seen_at, last_seen_at, success_count, failure_count) VALUES(?, ?, ?, 0, 0) ON CONFLICT(fingerprint) DO UPDATE SET last_seen_at=excluded.last_seen_at`, value, publishedAt, publishedAt); err != nil {
 			return err
 		}
 	}
@@ -298,6 +301,152 @@ func (store *SQLiteStore) EnabledSources(ctx context.Context) ([]Source, error) 
 		sources = append(sources, source)
 	}
 	return sources, rows.Err()
+}
+
+func (store *SQLiteStore) ScreeningCursor(ctx context.Context, sourceID string) (int, error) {
+	var offset int
+	err := store.db.QueryRowContext(ctx, "SELECT next_offset FROM source_screening_cursors WHERE source_id = ?", sourceID).Scan(&offset)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return offset, err
+}
+
+func (store *SQLiteStore) AdvanceScreeningCursor(ctx context.Context, sourceID string, offset int) error {
+	if offset < 0 {
+		return errors.New("screening cursor cannot be negative")
+	}
+	_, err := store.db.ExecContext(ctx, `INSERT INTO source_screening_cursors(source_id, next_offset, updated_at)
+		VALUES(?, ?, ?) ON CONFLICT(source_id) DO UPDATE SET next_offset=excluded.next_offset, updated_at=excluded.updated_at`,
+		sourceID, offset, time.Now().UTC().Format(time.RFC3339Nano))
+	return err
+}
+
+func (store *SQLiteStore) CandidateProbeDue(ctx context.Context, candidateFingerprint string, now time.Time) (bool, error) {
+	var lastProbe, isolatedUntil sql.NullString
+	var consecutiveFailures int
+	err := store.db.QueryRowContext(ctx, `SELECT last_probe_at, isolated_until, consecutive_failures
+		FROM candidate_fingerprints WHERE fingerprint = ?`, candidateFingerprint).Scan(&lastProbe, &isolatedUntil, &consecutiveFailures)
+	if errors.Is(err, sql.ErrNoRows) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if isolatedUntil.Valid {
+		until, err := time.Parse(time.RFC3339Nano, isolatedUntil.String)
+		if err != nil {
+			return false, err
+		}
+		if now.Before(until) {
+			return false, nil
+		}
+	}
+	if !lastProbe.Valid {
+		return true, nil
+	}
+	last, err := time.Parse(time.RFC3339Nano, lastProbe.String)
+	if err != nil {
+		return false, err
+	}
+	cooldown := healthyRecheck
+	if consecutiveFailures > 0 {
+		cooldown = probeCooldown
+	}
+	return !now.Before(last.Add(cooldown)), nil
+}
+
+func (store *SQLiteStore) RecordCandidateProbe(ctx context.Context, candidateFingerprint string, succeeded bool, now time.Time) error {
+	nowText := now.UTC().Format(time.RFC3339Nano)
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_fingerprints(fingerprint, first_seen_at, last_seen_at, success_count, failure_count, consecutive_failures, last_probe_at, last_success_at)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(fingerprint) DO UPDATE SET
+		last_seen_at=excluded.last_seen_at,
+		last_probe_at=excluded.last_probe_at,
+		last_success_at=CASE WHEN ? THEN excluded.last_success_at ELSE candidate_fingerprints.last_success_at END,
+		success_count=candidate_fingerprints.success_count + ?,
+		failure_count=candidate_fingerprints.failure_count + ?,
+		consecutive_failures=CASE WHEN ? THEN 0 ELSE candidate_fingerprints.consecutive_failures + 1 END,
+		isolated_until=CASE WHEN ? THEN NULL WHEN candidate_fingerprints.consecutive_failures + 1 >= 3 THEN ? ELSE candidate_fingerprints.isolated_until END`,
+		candidateFingerprint, nowText, nowText, boolInt(succeeded), boolInt(!succeeded), boolInt(!succeeded), nowText, nullableStringIf(succeeded, nowText),
+		succeeded, boolInt(succeeded), boolInt(!succeeded), succeeded, succeeded, now.Add(isolationTime).UTC().Format(time.RFC3339Nano)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (store *SQLiteStore) CandidateQuality(ctx context.Context, fingerprints []string) (map[string]CandidateQuality, error) {
+	qualities := make(map[string]CandidateQuality, len(fingerprints))
+	if len(fingerprints) == 0 {
+		return qualities, nil
+	}
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(fingerprints)), ",")
+	args := make([]any, 0, len(fingerprints))
+	for _, value := range fingerprints {
+		args = append(args, value)
+	}
+	rows, err := store.db.QueryContext(ctx, `SELECT fingerprint, success_count, failure_count, consecutive_failures, assignment_count, last_success_at
+		FROM candidate_fingerprints WHERE fingerprint IN (`+placeholders+")", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var fingerprint string
+		var quality CandidateQuality
+		var lastSuccess sql.NullString
+		if err := rows.Scan(&fingerprint, &quality.SuccessCount, &quality.FailureCount, &quality.ConsecutiveFails, &quality.AssignmentCount, &lastSuccess); err != nil {
+			return nil, err
+		}
+		if lastSuccess.Valid {
+			parsed, err := time.Parse(time.RFC3339Nano, lastSuccess.String)
+			if err != nil {
+				return nil, err
+			}
+			quality.LastSuccessAt = &parsed
+		}
+		qualities[fingerprint] = quality
+	}
+	return qualities, rows.Err()
+}
+
+func (store *SQLiteStore) RecordCandidateAssignments(ctx context.Context, fingerprints []string) error {
+	if len(fingerprints) == 0 {
+		return nil
+	}
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, candidateFingerprint := range fingerprints {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_fingerprints(fingerprint, first_seen_at, last_seen_at, success_count, failure_count, assignment_count)
+			VALUES(?, ?, ?, 0, 0, 1)
+			ON CONFLICT(fingerprint) DO UPDATE SET assignment_count=candidate_fingerprints.assignment_count + 1`, candidateFingerprint, now, now); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func boolInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
+}
+
+func nullableStringIf(ok bool, value string) any {
+	if !ok {
+		return nil
+	}
+	return value
 }
 
 func (store *SQLiteStore) source(ctx context.Context, sourceID string) (Source, error) {

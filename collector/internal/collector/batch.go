@@ -134,13 +134,17 @@ func (runner BatchRunner) screenSources(ctx context.Context, sources []Source) <
 	jobs := make(chan Source)
 	workers := runner.effectiveFetchConcurrency()
 	probeSlots := make(chan struct{}, runner.effectiveTCPConcurrency())
+	probeBudget := make(chan struct{}, maxScreenedCandidates)
+	seenCandidates := make(map[string]struct{})
+	var seenMutex sync.Mutex
+	sourceBudgets := allocateSourceBudgets(sources, time.Now().UTC())
 	var group sync.WaitGroup
 	for range workers {
 		group.Add(1)
 		go func() {
 			defer group.Done()
 			for source := range jobs {
-				candidates, deferred, err := runner.fetchAndScreen(ctx, source, probeSlots)
+				candidates, deferred, err := runner.fetchAndScreen(ctx, source, probeSlots, probeBudget, seenCandidates, &seenMutex, sourceBudgets[source.ID])
 				results <- sourceScreenResult{source: source, candidates: candidates, deferred: deferred, err: err}
 			}
 		}()
@@ -198,7 +202,7 @@ func (runner BatchRunner) effectiveFetchConcurrency() int {
 	return runner.FetchConcurrency
 }
 
-func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source, probeSlots chan struct{}) ([]string, bool, error) {
+func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source, probeSlots, probeBudget chan struct{}, seen map[string]struct{}, seenMutex *sync.Mutex, sourceBudget int) ([]string, bool, error) {
 	body, err := runner.Fetcher.Fetch(ctx, source)
 	if err != nil {
 		return nil, errors.Is(ctx.Err(), context.DeadlineExceeded), err
@@ -207,19 +211,65 @@ func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source, pro
 	if err != nil {
 		return nil, errors.Is(ctx.Err(), context.DeadlineExceeded), err
 	}
-	screened := candidates
+	eligible := candidates
 	if runner.Prober != nil {
-		screened = selectProbeCandidates(candidates)
+		eligible = eligibleProbeCandidates(candidates)
 	}
-	accepted, failures := runner.screenCandidates(ctx, candidates, probeSlots)
+	offset := 0
+	if runner.Store != nil {
+		offset, err = runner.Store.ScreeningCursor(ctx, source.ID)
+		if err != nil {
+			return nil, false, fmt.Errorf("read source screening cursor: %w", err)
+		}
+	}
+	screened, nextOffset := rotateCandidates(eligible, offset, sourceBudget)
+	if runner.Store != nil && sourceBudget > 0 && len(eligible) > 0 {
+		if err := runner.Store.AdvanceScreeningCursor(ctx, source.ID, nextOffset); err != nil {
+			return nil, false, fmt.Errorf("advance source screening cursor: %w", err)
+		}
+	}
+	if runner.Store != nil {
+		dueCandidates := make([]string, 0, len(screened))
+		for _, candidate := range screened {
+			candidateFingerprint := fingerprint(runner.FingerprintKey, candidate)
+			due, err := runner.Store.CandidateProbeDue(ctx, candidateFingerprint, time.Now().UTC())
+			if err != nil {
+				return nil, false, fmt.Errorf("read candidate probe schedule: %w", err)
+			}
+			if due {
+				dueCandidates = append(dueCandidates, candidate)
+			}
+		}
+		screened = dueCandidates
+	}
+	accepted, failures := runner.screenCandidates(ctx, screened, probeSlots, probeBudget, seen, seenMutex)
 	slog.Info("candidate screening summary", "component", "batch", "source_id", source.ID, "received_count", len(candidates), "eligible_count", len(screened), "unsupported_count", len(candidates)-len(screened), "accepted_count", len(accepted), "tcp_failed_count", failures["tcp_failed"], "proxy_http_failed_count", failures["proxy_http_failed"], "http_status_count", failures["http_status"], "invalid_count", failures["invalid"])
+	deferred := errors.Is(ctx.Err(), context.DeadlineExceeded) || len(probeBudget) == cap(probeBudget)
 	if len(accepted) == 0 {
-		return nil, errors.Is(ctx.Err(), context.DeadlineExceeded), ErrNoScreenedCandidates
+		return nil, deferred, ErrNoScreenedCandidates
 	}
-	return accepted, errors.Is(ctx.Err(), context.DeadlineExceeded), nil
+	return accepted, deferred, nil
 }
 
-func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string, probeSlots chan struct{}) ([]string, map[string]int) {
+func allocateSourceBudgets(sources []Source, now time.Time) map[string]int {
+	budgets := make(map[string]int, len(sources))
+	if len(sources) == 0 {
+		return budgets
+	}
+	base := maxScreenedCandidates / len(sources)
+	for _, source := range sources {
+		budgets[source.ID] = base
+	}
+	extra := maxScreenedCandidates % len(sources)
+	start := now.YearDay() % len(sources)
+	for index := range extra {
+		source := sources[(start+index)%len(sources)]
+		budgets[source.ID]++
+	}
+	return budgets
+}
+
+func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []string, probeSlots, probeBudget chan struct{}, seen map[string]struct{}, seenMutex *sync.Mutex) ([]string, map[string]int) {
 	if runner.Prober != nil {
 		candidates = selectProbeCandidates(candidates)
 	} else if len(candidates) > maxScreenedCandidates {
@@ -235,12 +285,26 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 		go func() {
 			defer workers.Done()
 			for candidate := range jobs {
+				candidateFingerprint := fingerprint(runner.FingerprintKey, candidate)
+				seenMutex.Lock()
+				_, exists := seen[candidateFingerprint]
+				seen[candidateFingerprint] = struct{}{}
+				seenMutex.Unlock()
+				if exists {
+					continue
+				}
 				endpoint, err := candidateEndpoint(candidate)
 				if err != nil {
+					_ = runner.recordCandidateProbe(candidate, false)
 					failures <- "invalid"
 					continue
 				}
 				{
+					select {
+					case probeBudget <- struct{}{}:
+					default:
+						return
+					}
 					select {
 					case probeSlots <- struct{}{}:
 					case <-ctx.Done():
@@ -254,13 +318,22 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 					cancel()
 					<-probeSlots
 					if err == nil {
+						if recordErr := runner.recordCandidateProbe(candidate, true); recordErr != nil {
+							slog.Error("record successful candidate probe", "component", "batch", "candidate_id", fingerprint(runner.FingerprintKey, candidate), "error", recordErr)
+						}
 						select {
 						case accepted <- candidate:
 						case <-ctx.Done():
 						}
 					} else if failure, ok := err.(probeFailure); ok {
+						if recordErr := runner.recordCandidateProbe(candidate, false); recordErr != nil {
+							slog.Error("record failed candidate probe", "component", "batch", "candidate_id", fingerprint(runner.FingerprintKey, candidate), "error", recordErr)
+						}
 						failures <- failure.category
 					} else {
+						if recordErr := runner.recordCandidateProbe(candidate, false); recordErr != nil {
+							slog.Error("record failed candidate probe", "component", "batch", "candidate_id", fingerprint(runner.FingerprintKey, candidate), "error", recordErr)
+						}
 						failures <- "tcp_failed"
 					}
 				}
@@ -305,6 +378,15 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 	return result, counts
 }
 
+func (runner BatchRunner) recordCandidateProbe(candidate string, succeeded bool) error {
+	if runner.Store == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), finalizationDeadline)
+	defer cancel()
+	return runner.Store.RecordCandidateProbe(ctx, fingerprint(runner.FingerprintKey, candidate), succeeded, time.Now().UTC())
+}
+
 func (runner BatchRunner) tcpReachable(ctx context.Context, endpoint string) error {
 	if runner.TCPChecker != nil {
 		return runner.TCPChecker(ctx, runner.Resolver, endpoint)
@@ -313,13 +395,7 @@ func (runner BatchRunner) tcpReachable(ctx context.Context, endpoint string) err
 }
 
 func selectProbeCandidates(candidates []string) []string {
-	eligible := make([]string, 0, maxScreenedCandidates)
-	for _, candidate := range candidates {
-		if !supportsBoundedProbe(candidate) {
-			continue
-		}
-		eligible = append(eligible, candidate)
-	}
+	eligible := eligibleProbeCandidates(candidates)
 	if len(eligible) <= maxScreenedCandidates {
 		return eligible
 	}
@@ -328,6 +404,30 @@ func selectProbeCandidates(candidates []string) []string {
 		selected = append(selected, eligible[index*len(eligible)/maxScreenedCandidates])
 	}
 	return selected
+}
+
+func eligibleProbeCandidates(candidates []string) []string {
+	eligible := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if !supportsBoundedProbe(candidate) {
+			continue
+		}
+		eligible = append(eligible, candidate)
+	}
+	return eligible
+}
+
+func rotateCandidates(candidates []string, offset, limit int) ([]string, int) {
+	if len(candidates) == 0 || limit <= 0 {
+		return nil, 0
+	}
+	start := offset % len(candidates)
+	count := min(limit, len(candidates))
+	selected := make([]string, 0, count)
+	for index := range count {
+		selected = append(selected, candidates[(start+index)%len(candidates)])
+	}
+	return selected, (start + count) % len(candidates)
 }
 
 func candidateEndpoint(candidate string) (string, error) {
@@ -357,8 +457,33 @@ func tcpReachable(ctx context.Context, resolver Resolver, endpoint string) error
 
 func fingerprint(key []byte, candidate string) string {
 	mac := hmac.New(sha256.New, key)
-	_, _ = mac.Write([]byte(candidate))
+	_, _ = mac.Write([]byte(canonicalCandidate(candidate)))
 	return fmt.Sprintf("%x", mac.Sum(nil))
+}
+
+func canonicalCandidate(candidate string) string {
+	parsed, err := url.Parse(strings.TrimSpace(candidate))
+	if err != nil || parsed.Scheme == "" || parsed.Hostname() == "" {
+		return strings.TrimSpace(candidate)
+	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	port := parsed.Port()
+	host := strings.ToLower(parsed.Hostname())
+	if port == "" {
+		parsed.Host = host
+	} else {
+		parsed.Host = net.JoinHostPort(host, port)
+	}
+	values := parsed.Query()
+	for key := range values {
+		sort.Strings(values[key])
+	}
+	delete(values, "remarks")
+	delete(values, "remark")
+	parsed.RawQuery = values.Encode()
+	parsed.Fragment = ""
+	parsed.RawFragment = ""
+	return parsed.String()
 }
 
 type publication struct {

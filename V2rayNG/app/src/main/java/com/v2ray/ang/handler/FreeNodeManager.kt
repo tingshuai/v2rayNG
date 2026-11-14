@@ -70,6 +70,17 @@ object FreeNodeManager {
         if (isEnabled()) FreeNodeProbeScheduler.schedule()
     }
 
+    fun retainRecentlyValidatedProfiles(incoming: Collection<ProfileItem>): List<ProfileItem> {
+        val state = loadHistory()
+        val existing = MmkvManager.decodeServerList(AppConfig.FREE_NODE_SUBSCRIPTION_ID)
+            .mapNotNull(MmkvManager::decodeServerConfig)
+        return FreeNodeHistoryMigrator.recentlyValidatedProfiles(state, existing, incoming, ::fingerprint, System.currentTimeMillis())
+    }
+
+    fun selectableFingerprints(now: Long = System.currentTimeMillis()): Set<String> = loadHistory().entries
+        .filterValues { FreeNodeHistoryMigrator.isSelectable(it, now) }
+        .keys
+
     fun probePlan(now: Long = System.currentTimeMillis()): Map<String, String> {
         val profiles = MmkvManager.decodeServerList(AppConfig.FREE_NODE_SUBSCRIPTION_ID)
             .mapNotNull { guid -> MmkvManager.decodeServerConfig(guid)?.let { profile -> fingerprint(profile) to guid } }

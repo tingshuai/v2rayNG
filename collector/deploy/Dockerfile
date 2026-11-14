@@ -14,4 +14,4 @@ COPY --from=build /src/migrations /app/migrations
 COPY --from=sing-box /usr/local/bin/sing-box /usr/local/bin/sing-box
 USER nonroot:nonroot
 ENTRYPOINT ["/app/collector"]
-CMD ["serve", "-database", "/data/collector.sqlite", "-migrations", "/app/migrations", "-work-dir", "/data", "-listen", "127.0.0.1:8080"]
+CMD ["serve", "-database", "/data/collector.sqlite", "-migrations", "/app/migrations", "-work-dir", "/data", "-listen", "127.0.0.1:8080", "-fingerprint-key-file", "/run/secrets/collector_fingerprint_key"]

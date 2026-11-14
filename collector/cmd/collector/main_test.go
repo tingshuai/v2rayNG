@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -53,5 +54,26 @@ func TestServeMuxHealthAndSubscriptionAvailability(t *testing.T) {
 	mux.ServeHTTP(healthResponse, healthRequest)
 	if healthResponse.Code != http.StatusServiceUnavailable {
 		t.Fatalf("stale health status = %d, want %d", healthResponse.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestServeMuxUsesSelectedWeightedSubscriptionResponse(t *testing.T) {
+	workDir := t.TempDir()
+	published := filepath.Join(workDir, "published")
+	if err := os.MkdirAll(published, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(published, "subscription.txt"), []byte("cHVibGlzaGVk"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	selectorCalled := false
+	mux := newServeMux(workDir, time.Hour, func(_ context.Context, _ []byte) ([]byte, error) {
+		selectorCalled = true
+		return []byte("c2VsZWN0ZWQ="), nil
+	})
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/subscription", nil))
+	if response.Code != http.StatusOK || response.Body.String() != "c2VsZWN0ZWQ=" || !selectorCalled {
+		t.Fatalf("response status=%d body=%q selectorCalled=%v", response.Code, response.Body.String(), selectorCalled)
 	}
 }

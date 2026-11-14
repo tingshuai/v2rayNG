@@ -9,6 +9,7 @@ import com.v2ray.ang.enums.CoreResolvedType
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.isNotNullEmpty
+import com.v2ray.ang.handler.FreeNodeManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.util.LogUtil
@@ -144,6 +145,8 @@ object CoreConfigContextBuilder {
     private fun resolvePolicyGroupProfiles(config: ProfileItem): List<ProfileItem> {
         try {
             val serverList = MmkvManager.decodeAllServerList()
+            val isFreeNodeGroup = config.policyGroupSubscriptionId == AppConfig.FREE_NODE_SUBSCRIPTION_ID
+            val selectableFreeNodeFingerprints = if (isFreeNodeGroup) FreeNodeManager.selectableFingerprints() else emptySet()
             return serverList
                 .asSequence()
                 .mapNotNull { id -> MmkvManager.decodeServerConfig(id) }
@@ -166,6 +169,9 @@ object CoreConfigContextBuilder {
                             profile.remarks.contains(filter)
                         }
                     }
+                }
+                .filter { profile ->
+                    !isFreeNodeGroup || FreeNodeManager.fingerprint(profile) in selectableFreeNodeFingerprints
                 }
                 .filter { it.server.isNotNullEmpty() }
                 .filter { Utils.isPureIpAddress(it.server!!) || Utils.isValidUrl(it.server!!) }

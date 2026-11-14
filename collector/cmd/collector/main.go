@@ -128,15 +128,28 @@ func serve(arguments []string) {
 	listen := flags.String("listen", "127.0.0.1:8080", "loopback listen address")
 	workDir := flags.String("work-dir", "./data", "runtime work directory")
 	maxPublishAge := flags.Duration("max-publish-age", 2*time.Hour, "maximum age of a published subscription accepted by /healthz")
+	keyFile := flags.String("fingerprint-key-file", "", "path to a 32-byte deployment secret used for anonymous distribution")
 	flags.Parse(arguments)
+	if *keyFile == "" {
+		fail(errors.New("-fingerprint-key-file is required"))
+	}
+	key, err := os.ReadFile(*keyFile)
+	if err != nil {
+		fail(fmt.Errorf("read fingerprint key: %w", err))
+	}
 	store := openAndMigrate(*database, *migrations)
 	defer store.Close()
-	server := &http.Server{Addr: *listen, Handler: newServeMux(*workDir, *maxPublishAge), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	selector := func(ctx context.Context, published []byte) ([]byte, error) {
+		return collector.DistributeSubscription(ctx, store, key, published, collector.DefaultDistributionLimit)
+	}
+	server := &http.Server{Addr: *listen, Handler: newServeMux(*workDir, *maxPublishAge, selector), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
 	slog.Info("collector listening", "address", *listen)
 	fail(server.ListenAndServe())
 }
 
-func newServeMux(workDir string, maxPublishAge time.Duration) *http.ServeMux {
+type subscriptionSelector func(context.Context, []byte) ([]byte, error)
+
+func newServeMux(workDir string, maxPublishAge time.Duration, selectors ...subscriptionSelector) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Cache-Control", "no-store")
@@ -158,9 +171,18 @@ func newServeMux(workDir string, maxPublishAge time.Duration) *http.ServeMux {
 			http.Error(writer, "subscription unavailable", http.StatusInternalServerError)
 			return
 		}
+		response := output
+		if len(selectors) > 0 {
+			selected, err := selectors[0](request.Context(), output)
+			if err != nil {
+				slog.Error("select subscription candidates", "component", "http", "error", err)
+			} else {
+				response = selected
+			}
+		}
 		writer.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		writer.Header().Set("Cache-Control", "public, max-age=300")
-		_, _ = writer.Write(output)
+		writer.Header().Set("Cache-Control", "no-store")
+		_, _ = writer.Write(response)
 	})
 	return mux
 }
