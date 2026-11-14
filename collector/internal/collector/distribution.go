@@ -42,12 +42,17 @@ func candidateDistributionWeight(quality CandidateQuality, now time.Time) float6
 }
 
 func selectWeightedCandidates(candidates []string, qualities map[string]CandidateQuality, key []byte, limit int, now time.Time, random *mathrand.Rand) ([]string, []string) {
+	return selectWeightedCandidatesWithSources(candidates, qualities, nil, key, limit, now, random)
+}
+
+func selectWeightedCandidatesWithSources(candidates []string, qualities map[string]CandidateQuality, sourceSets map[string][]string, key []byte, limit int, now time.Time, random *mathrand.Rand) ([]string, []string) {
 	if limit <= 0 || len(candidates) == 0 {
 		return nil, nil
 	}
 	type weightedCandidate struct {
 		config      string
 		fingerprint string
+		sources     []string
 		weight      float64
 	}
 	weighted := make([]weightedCandidate, 0, len(candidates))
@@ -58,14 +63,21 @@ func selectWeightedCandidates(candidates []string, qualities map[string]Candidat
 			continue
 		}
 		seen[fingerprint] = struct{}{}
-		weighted = append(weighted, weightedCandidate{config: candidate, fingerprint: fingerprint, weight: candidateDistributionWeight(qualities[fingerprint], now)})
+		weighted = append(weighted, weightedCandidate{config: candidate, fingerprint: fingerprint, sources: sourceSets[fingerprint], weight: candidateDistributionWeight(qualities[fingerprint], now)})
 	}
 	selected := make([]string, 0, min(limit, len(weighted)))
 	selectedFingerprints := make([]string, 0, min(limit, len(weighted)))
+	sourceCounts := make(map[string]int)
 	for len(weighted) > 0 && len(selected) < limit {
 		total := 0.0
 		for _, candidate := range weighted {
-			total += candidate.weight
+			pressure := 1
+			for _, sourceID := range candidate.sources {
+				if sourceCounts[sourceID] > pressure {
+					pressure = sourceCounts[sourceID]
+				}
+			}
+			total += candidate.weight / float64(pressure)
 		}
 		if total <= 0 {
 			return selected, selectedFingerprints
@@ -73,7 +85,13 @@ func selectWeightedCandidates(candidates []string, qualities map[string]Candidat
 		target := random.Float64() * total
 		chosen := len(weighted) - 1
 		for index, candidate := range weighted {
-			target -= candidate.weight
+			pressure := 1
+			for _, sourceID := range candidate.sources {
+				if sourceCounts[sourceID] > pressure {
+					pressure = sourceCounts[sourceID]
+				}
+			}
+			target -= candidate.weight / float64(pressure)
 			if target < 0 {
 				chosen = index
 				break
@@ -81,6 +99,9 @@ func selectWeightedCandidates(candidates []string, qualities map[string]Candidat
 		}
 		selected = append(selected, weighted[chosen].config)
 		selectedFingerprints = append(selectedFingerprints, weighted[chosen].fingerprint)
+		for _, sourceID := range weighted[chosen].sources {
+			sourceCounts[sourceID]++
+		}
 		weighted = append(weighted[:chosen], weighted[chosen+1:]...)
 	}
 	return selected, selectedFingerprints
@@ -112,7 +133,11 @@ func DistributeSubscription(ctx context.Context, store Store, key, published []b
 			return nil, err
 		}
 		rng := mathrand.New(mathrand.NewSource(int64(binary.LittleEndian.Uint64(seedBytes[:]))))
-		selected, selectedFingerprints = selectWeightedCandidates(candidates, qualities, key, limit, time.Now().UTC(), rng)
+		sources, err := store.CandidateSources(ctx, fingerprints)
+		if err != nil {
+			return nil, err
+		}
+		selected, selectedFingerprints = selectWeightedCandidatesWithSources(candidates, qualities, sources, key, limit, time.Now().UTC(), rng)
 	}
 	if len(selected) == 0 {
 		return published, nil

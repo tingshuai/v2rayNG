@@ -212,6 +212,49 @@ func TestCandidateQualityAndAssignmentPressureAreAggregated(t *testing.T) {
 	}
 }
 
+func TestCandidateRetentionRequiresSuccessfulSourceInventoryAbsence(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	for _, id := range []string{"source-a", "source-b"} {
+		if err := store.RegisterSource(ctx, SourceRegistration{ID: id, FetchURL: "https://" + id + ".example/subscription", MinFetchInterval: time.Minute}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().UTC().Add(-runRetention - time.Hour)
+	if err := store.RecordSourceCandidates(ctx, "source-a", []string{"candidate-old"}, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordSourceCandidates(ctx, "source-b", []string{"candidate-old"}, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordSourceCandidates(ctx, "source-a", nil, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PruneExpired(ctx, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM candidate_fingerprints WHERE fingerprint='candidate-old'").Scan(&count); err != nil || count != 1 {
+		t.Fatalf("candidate after only one source confirms absence = %d, err=%v; want retained", count, err)
+	}
+	if err := store.RecordSourceCandidates(ctx, "source-b", nil, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PruneExpired(ctx, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM candidate_fingerprints WHERE fingerprint='candidate-old'").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("candidate after every source confirms absence = %d, err=%v; want deleted", count, err)
+	}
+}
+
 func TestPruneExpiredRemovesOnlyExpiredRecords(t *testing.T) {
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
 	if err != nil {

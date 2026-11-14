@@ -35,6 +35,9 @@ func (store *recordingStore) RecordRun(_ context.Context, _ string, outcome RunO
 func (store *recordingStore) RecordPublication(context.Context, []string, PublishedSnapshot) error {
 	return nil
 }
+func (store *recordingStore) RecordSourceCandidates(context.Context, string, []string, time.Time) error {
+	return nil
+}
 func (store *recordingStore) EnabledSources(context.Context) ([]Source, error) {
 	return store.sources, nil
 }
@@ -48,6 +51,9 @@ func (store *recordingStore) RecordCandidateProbe(context.Context, string, bool,
 }
 func (store *recordingStore) CandidateQuality(context.Context, []string) (map[string]CandidateQuality, error) {
 	return map[string]CandidateQuality{}, nil
+}
+func (store *recordingStore) CandidateSources(context.Context, []string) (map[string][]string, error) {
+	return map[string][]string{}, nil
 }
 func (store *recordingStore) RecordCandidateAssignments(context.Context, []string) error { return nil }
 func (store *recordingStore) PruneExpired(context.Context, time.Time) error {

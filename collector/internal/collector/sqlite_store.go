@@ -279,6 +279,34 @@ func (store *SQLiteStore) RecordPublication(ctx context.Context, fingerprints []
 	return tx.Commit()
 }
 
+func (store *SQLiteStore) RecordSourceCandidates(ctx context.Context, sourceID string, fingerprints []string, fetchedAt time.Time) error {
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var exists int
+	if err := tx.QueryRowContext(ctx, "SELECT 1 FROM sources WHERE source_id = ?", sourceID).Scan(&exists); err != nil {
+		return err
+	}
+	now := fetchedAt.UTC().Format(time.RFC3339Nano)
+	if _, err := tx.ExecContext(ctx, `INSERT INTO source_inventories(source_id, succeeded_at) VALUES(?, ?)
+		ON CONFLICT(source_id) DO UPDATE SET succeeded_at=excluded.succeeded_at`, sourceID, now); err != nil {
+		return err
+	}
+	for _, candidateFingerprint := range fingerprints {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_fingerprints(fingerprint, first_seen_at, last_seen_at, success_count, failure_count)
+			VALUES(?, ?, ?, 0, 0) ON CONFLICT(fingerprint) DO UPDATE SET last_seen_at=excluded.last_seen_at`, candidateFingerprint, now, now); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO source_candidate_presence(source_id, fingerprint, last_present_at) VALUES(?, ?, ?)
+			ON CONFLICT(source_id, fingerprint) DO UPDATE SET last_present_at=excluded.last_present_at`, sourceID, candidateFingerprint, now); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func nullableString(value string) any {
 	if value == "" {
 		return nil
@@ -415,6 +443,31 @@ func (store *SQLiteStore) CandidateQuality(ctx context.Context, fingerprints []s
 	return qualities, rows.Err()
 }
 
+func (store *SQLiteStore) CandidateSources(ctx context.Context, fingerprints []string) (map[string][]string, error) {
+	sources := make(map[string][]string, len(fingerprints))
+	if len(fingerprints) == 0 {
+		return sources, nil
+	}
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(fingerprints)), ",")
+	args := make([]any, 0, len(fingerprints))
+	for _, value := range fingerprints {
+		args = append(args, value)
+	}
+	rows, err := store.db.QueryContext(ctx, `SELECT fingerprint, source_id FROM source_candidate_presence WHERE fingerprint IN (`+placeholders+") ORDER BY fingerprint, source_id", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var fingerprint, sourceID string
+		if err := rows.Scan(&fingerprint, &sourceID); err != nil {
+			return nil, err
+		}
+		sources[fingerprint] = append(sources[fingerprint], sourceID)
+	}
+	return sources, rows.Err()
+}
+
 func (store *SQLiteStore) RecordCandidateAssignments(ctx context.Context, fingerprints []string) error {
 	if len(fingerprints) == 0 {
 		return nil
@@ -495,7 +548,15 @@ func (store *SQLiteStore) PruneExpired(ctx context.Context, now time.Time) error
 	if _, err = tx.ExecContext(ctx, "DELETE FROM source_runs WHERE finished_at < ?", now.Add(-runRetention).UTC().Format(time.RFC3339Nano)); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, "DELETE FROM candidate_fingerprints WHERE last_seen_at < ?", now.Add(-runRetention).UTC().Format(time.RFC3339Nano)); err != nil {
+	cutoff := now.Add(-runRetention).UTC().Format(time.RFC3339Nano)
+	if _, err = tx.ExecContext(ctx, `DELETE FROM source_candidate_presence
+		WHERE last_present_at < ? AND EXISTS (
+			SELECT 1 FROM source_inventories i WHERE i.source_id=source_candidate_presence.source_id
+			AND i.succeeded_at > source_candidate_presence.last_present_at)`, cutoff); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM candidate_fingerprints WHERE last_seen_at < ? AND NOT EXISTS (
+		SELECT 1 FROM source_candidate_presence p WHERE p.fingerprint=candidate_fingerprints.fingerprint)`, cutoff); err != nil {
 		return err
 	}
 	return tx.Commit()

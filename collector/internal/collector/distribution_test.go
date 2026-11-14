@@ -53,6 +53,27 @@ func TestWeightedCandidateSelectionIsBoundedUniqueAndReproducible(t *testing.T) 
 	}
 }
 
+func TestWeightedSelectionReducesConcentrationFromOneSource(t *testing.T) {
+	key := make([]byte, 32)
+	candidates := make([]string, 21)
+	sources := make(map[string][]string, len(candidates))
+	for index := range candidates {
+		candidates[index] = "candidate-" + strconv.Itoa(index)
+		sourceID := "source-a"
+		if index == len(candidates)-1 {
+			sourceID = "source-b"
+		}
+		sources[fingerprint(key, candidates[index])] = []string{sourceID}
+	}
+	selected, _ := selectWeightedCandidatesWithSources(candidates, nil, sources, key, 12, time.Now().UTC(), rand.New(rand.NewSource(7)))
+	for _, candidate := range selected {
+		if candidate == candidates[len(candidates)-1] {
+			return
+		}
+	}
+	t.Fatal("selection omitted the only candidate from a distinct source")
+}
+
 func TestDistributeSubscriptionReturnsBoundedSampleAndRecordsOnlyAggregateAssignments(t *testing.T) {
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
 	if err != nil {

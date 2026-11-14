@@ -211,6 +211,15 @@ func (runner BatchRunner) fetchAndScreen(ctx context.Context, source Source, pro
 	if err != nil {
 		return nil, errors.Is(ctx.Err(), context.DeadlineExceeded), err
 	}
+	if runner.Store != nil {
+		fingerprints := make([]string, 0, len(candidates))
+		for _, candidate := range candidates {
+			fingerprints = append(fingerprints, fingerprint(runner.FingerprintKey, candidate))
+		}
+		if err := runner.Store.RecordSourceCandidates(ctx, source.ID, fingerprints, time.Now().UTC()); err != nil {
+			return nil, false, fmt.Errorf("record source inventory: %w", err)
+		}
+	}
 	eligible := candidates
 	if runner.Prober != nil {
 		eligible = eligibleProbeCandidates(candidates)
