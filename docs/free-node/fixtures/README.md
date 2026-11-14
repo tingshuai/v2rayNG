@@ -6,9 +6,8 @@
 
 | ID | 输入概述 | 预期结果 |
 | --- | --- | --- |
-| `source-public-allowed` | 公开、无认证，且声明允许订阅分发的 HTTPS 来源 | 可登记为启用来源 |
+| `source-public-unauthenticated` | 公开、无需认证的 HTTPS 来源 | 可登记为启用来源 |
 | `source-auth-required` | 要求登录、Cookie、验证码或令牌的来源 | 拒绝登记，审计不含认证材料 |
-| `source-distribution-forbidden` | 公开但未允许订阅分发的来源 | 拒绝登记 |
 | `source-third-fetch-failure` | 同一来源连续三次超时/失败 | 第三次后暂停，已有有效输出不被覆盖 |
 | `source-explicit-reenable` | 已暂停来源的显式启用操作 | 仅在全量校验通过后恢复；定时任务不恢复 |
 | `target-loopback` | DNS 解析至回环地址 | 在连接前拒绝 |
