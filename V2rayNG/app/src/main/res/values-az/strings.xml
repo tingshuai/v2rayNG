@@ -578,4 +578,22 @@
     <string name="free_node_policy_group_name">Pulsuz qovşağın avtomatik seçimi</string>
     <string name="free_node_feedback_title">Anonim yoxlama rəyi göndər</string>
     <string name="free_node_feedback_summary">Şəbəkə təsdiqləndikdən sonra yalnız ümumi nəticələr və gecikmə aralıqları göndərilir. Konfiqurasiya və cihaz ID-si göndərilmir.</string>
+    <string name="fn21_subscriptions">Abunəliklər</string>
+    <string name="fn21_counts">%1$d qovşaq · %2$d işləyir · %3$d uğursuz · %4$d yoxlanmayıb</string>
+    <string name="fn21_free_fixed">Silinmir</string>
+    <string name="fn21_back">Geri</string>
+    <string name="fn21_subscription_summary">%1$s: %2$d qovşaq, %3$d işləyir, %4$d uğursuz, %5$d yoxlanmayıb</string>
+    <string name="fn21_last_test">Son real yoxlama: %1$s</string>
+    <string name="fn21_unknown_region">Naməlum bölgə</string>
+    <string name="fn21_untested">Yoxlanmayıb</string>
+    <string name="fn21_failed">Uğursuz</string>
+    <string name="fn21_free_subtitle">Namizəd siyahısı · avtomatik yenilənir</string>
+    <string name="fn21_user_subtitle">Abunəlik saxlanıb · ayarlara görə yenilənir</string>
+    <string name="fn21_node_summary">%1$d qovşaq · %2$d yoxlanıb</string>
+    <string name="fn21_healthy">İşləyir</string>
+    <string name="fn21_node_semantics">%1$s, %2$s, %3$s</string>
+    <string name="fn21_search_nodes">Qovşaq və ya ölkə axtar</string>
+    <string name="fn21_bottom_status">%1$s · %2$d ms</string>
+    <string name="fn21_manual_import">Əl ilə idxal</string>
+    <string name="fn21_manual_subtitle">Yerli qovşaqlar · avtomatik yenilənmir</string>
 </resources>

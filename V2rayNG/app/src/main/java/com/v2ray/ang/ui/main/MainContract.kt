@@ -20,13 +20,17 @@ data class MainUiState(
     val groups: List<GroupMapItem> = emptyList(),
     val selectedGroupId: String = "",
     val selectedGuid: String? = null,
+    val selectedServerLabel: String? = null,
+    val selectedServerDelayMillis: Long = 0L,
     val isRunning: Boolean = false,
     val isTesting: Boolean = false,
     val status: MainStatus = MainStatus.Disconnected,
     val locateTarget: LocateTarget? = null,
     val confirmRemove: Boolean = false,
     val doubleColumnDisplay: Boolean = false,
-    val shareQRCodeBitmap: android.graphics.Bitmap? = null
+    val shareQRCodeBitmap: android.graphics.Bitmap? = null,
+    val showingSubscriptions: Boolean = true,
+    val selectedCountryCode: String? = null,
 )
 
 /**
@@ -56,6 +60,9 @@ sealed interface MainAction {
     data object LocateSelectedServer : MainAction
 
     data class SelectGroup(val groupId: String) : MainAction
+    data class OpenSubscription(val groupId: String) : MainAction
+    data object CloseSubscription : MainAction
+    data class FilterCountry(val countryCode: String?) : MainAction
     data class SelectServer(val guid: String) : MainAction
     data class RemoveServer(val guid: String) : MainAction
     data class EditServer(val guid: String, val profile: com.v2ray.ang.dto.entities.ProfileItem) : MainAction

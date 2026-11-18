@@ -581,4 +581,22 @@
     <string name="free_node_policy_group_name">Автовыбор бесплатных узлов</string>
     <string name="free_node_feedback_title">Отправлять анонимные данные проверки</string>
     <string name="free_node_feedback_summary">При подтверждённом доступе к интернету отправляются только общие результаты и диапазоны задержки. Конфигурация и ID устройства не передаются.</string>
+    <string name="fn21_subscriptions">Подписки</string>
+    <string name="fn21_counts">%1$d узлов · %2$d работают · %3$d ошибок · %4$d не проверены</string>
+    <string name="fn21_free_fixed">Нельзя удалить</string>
+    <string name="fn21_back">Назад</string>
+    <string name="fn21_subscription_summary">%1$s: %2$d узлов, %3$d работают, %4$d ошибок, %5$d не проверены</string>
+    <string name="fn21_last_test">Последняя проверка: %1$s</string>
+    <string name="fn21_unknown_region">Регион неизвестен</string>
+    <string name="fn21_untested">Не проверен</string>
+    <string name="fn21_failed">Ошибка</string>
+    <string name="fn21_free_subtitle">Список кандидатов · автообновление</string>
+    <string name="fn21_user_subtitle">Подписка сохранена · обновление по настройкам</string>
+    <string name="fn21_node_summary">%1$d узлов · проверено %2$d</string>
+    <string name="fn21_healthy">Работает</string>
+    <string name="fn21_node_semantics">%1$s, %2$s, %3$s</string>
+    <string name="fn21_search_nodes">Поиск узла или страны</string>
+    <string name="fn21_bottom_status">%1$s · %2$d мс</string>
+    <string name="fn21_manual_import">Ручной импорт</string>
+    <string name="fn21_manual_subtitle">Локальные узлы · без автообновления</string>
 </resources>

@@ -45,6 +45,7 @@ class SubscriptionsViewModel(application: Application) : BaseViewModel(applicati
     }
 
     fun remove(subId: String): Boolean {
+        if (subId == AppConfig.FREE_NODE_SUBSCRIPTION_ID) return false
         val changed = subscriptions.removeAll { it.guid == subId }
         if (changed) {
             SettingsManager.removeSubscriptionWithDefault(subId)
@@ -55,6 +56,7 @@ class SubscriptionsViewModel(application: Application) : BaseViewModel(applicati
     }
 
     fun update(subId: String, item: SubscriptionItem) {
+        if (subId == AppConfig.FREE_NODE_SUBSCRIPTION_ID) return
         val idx = subscriptions.indexOfFirst { it.guid == subId }
         if (idx >= 0) {
             subscriptions[idx] = SubscriptionCache(subId, item)
@@ -79,6 +81,8 @@ class SubscriptionsViewModel(application: Application) : BaseViewModel(applicati
     }
 
     fun move(fromPosition: Int, toPosition: Int) {
+        if (subscriptions.getOrNull(fromPosition)?.guid == AppConfig.FREE_NODE_SUBSCRIPTION_ID ||
+            subscriptions.getOrNull(toPosition)?.guid == AppConfig.FREE_NODE_SUBSCRIPTION_ID) return
         if (subscriptions.moveItem(fromPosition, toPosition)) {
             MmkvManager.encodeSubsList(subscriptions.mapTo(mutableListOf()) { it.guid })
             SettingsChangeManager.makeSetupGroupTab()

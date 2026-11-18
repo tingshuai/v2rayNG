@@ -19,6 +19,7 @@ internal data class ServerRowUiModel(
 internal data class ServerGroupUiState(
     val servers: List<ServersCache> = emptyList(),
     val rows: List<ServerRowUiModel> = emptyList(),
+    val countryByGuid: Map<String, String> = emptyMap(),
 )
 
 internal fun buildServerRowUiModel(

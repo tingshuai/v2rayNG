@@ -578,4 +578,22 @@
     <string name="free_node_policy_group_name">Free-node automatic selection</string>
     <string name="free_node_feedback_title">Share anonymous probe feedback</string>
     <string name="free_node_feedback_summary">When internet access is validated, share only coarse results and latency ranges. No configuration or device ID is sent.</string>
+    <string name="fn21_subscriptions">Subscriptions</string>
+    <string name="fn21_counts">%1$d nodes · %2$d healthy · %3$d failed · %4$d untested</string>
+    <string name="fn21_free_fixed">Cannot delete</string>
+    <string name="fn21_back">Back</string>
+    <string name="fn21_subscription_summary">%1$s: %2$d nodes, %3$d healthy, %4$d failed, %5$d untested</string>
+    <string name="fn21_last_test">Last real test: %1$s</string>
+    <string name="fn21_unknown_region">Unknown region</string>
+    <string name="fn21_untested">Untested</string>
+    <string name="fn21_failed">Failed</string>
+    <string name="fn21_free_subtitle">Candidate list · automatically updated</string>
+    <string name="fn21_user_subtitle">Saved subscription · automatic updates when enabled</string>
+    <string name="fn21_node_summary">%1$d nodes · %2$d tested</string>
+    <string name="fn21_healthy">Healthy</string>
+    <string name="fn21_node_semantics">%1$s, %2$s, %3$s</string>
+    <string name="fn21_search_nodes">Search nodes or countries</string>
+    <string name="fn21_bottom_status">%1$s · %2$d ms</string>
+    <string name="fn21_manual_import">Manual imports</string>
+    <string name="fn21_manual_subtitle">Local nodes · no automatic updates</string>
 </resources>

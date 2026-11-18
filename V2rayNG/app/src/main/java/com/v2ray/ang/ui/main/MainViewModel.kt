@@ -51,7 +51,7 @@ private fun applyTestDelayResults(
     if (delayMillis == null || delayMillis == server.testDelayMillis) {
         server
     } else {
-        server.copy(testDelayMillis = delayMillis)
+        server.copy(testDelayMillis = delayMillis, lastTestAt = System.currentTimeMillis())
     }
 }
 
@@ -75,6 +75,8 @@ class MainViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
     private val preloadDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val geoIpResolver = GeoIpCountryResolver(application.assets)
+    private val countryJobs = ConcurrentHashMap<String, Job>()
 
     // ---------- UI state ----------
     private val _uiState = MutableStateFlow(
@@ -217,6 +219,9 @@ class MainViewModel(
                 rows = applyTestDelayResultsToRows(current.rows, updates),
             )
         }
+        _uiState.update { state ->
+            state.selectedGuid?.let(updates::get)?.let { state.copy(selectedServerDelayMillis = it) } ?: state
+        }
     }
 
     internal fun formatStatus(status: MainStatus): String = when (status) {
@@ -288,6 +293,12 @@ class MainViewModel(
             is MainAction.UpdateGroupSubscription -> importConfigViaSub(action.groupId)
             MainAction.ExportAll -> exportAllAsync()
             is MainAction.SelectGroup -> subscriptionIdChanged(action.groupId)
+            is MainAction.OpenSubscription -> {
+                subscriptionIdChanged(action.groupId)
+                _uiState.update { it.copy(showingSubscriptions = false, selectedCountryCode = null) }
+            }
+            MainAction.CloseSubscription -> _uiState.update { it.copy(showingSubscriptions = true, selectedCountryCode = null) }
+            is MainAction.FilterCountry -> _uiState.update { it.copy(selectedCountryCode = action.countryCode) }
             is MainAction.SelectServer -> updateSelectedGuid(action.guid)
             is MainAction.RemoveServer -> removeServerAndRefresh(action.guid)
             is MainAction.Search -> filterConfig(action.query)
@@ -353,7 +364,8 @@ class MainViewModel(
             ServersCache(
                 guid = guid,
                 profile = profile.copy(),
-                testDelayMillis = affiliation?.testDelayMillis ?: 0L
+                testDelayMillis = affiliation?.testDelayMillis ?: 0L,
+                lastTestAt = affiliation?.lastTestAt ?: 0L,
             )
         }
 
@@ -396,6 +408,24 @@ class MainViewModel(
             servers = filteredServers,
             rows = buildServerRows(groupId, filteredServers)
         )
+        countryJobs.remove(groupId)?.cancel()
+        countryJobs[groupId] = viewModelScope.launch(defaultDispatcher) {
+            try {
+                val addresses = filteredServers.mapNotNull { it.profile.server }.distinct()
+                val countries = geoIpResolver.resolve(addresses)
+                val byGuid = filteredServers.mapNotNull { server ->
+                    countries[server.profile.server]?.let { server.guid to it }
+                }.toMap()
+                mutableServerGroupState(groupId).update { current ->
+                    if (current.servers.map { it.guid } == filteredServers.map { it.guid }) current.copy(countryByGuid = byGuid)
+                    else current
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                LogUtil.e(AppConfig.TAG, "Failed to identify server countries for group $groupId", error)
+            }
+        }
     }
 
     private fun buildServerRows(groupId: String, servers: List<ServersCache>): List<ServerRowUiModel> {
@@ -449,6 +479,7 @@ class MainViewModel(
         setupGroupJob?.cancel()
         preloadJob?.cancel()
         selectedGroupLoadJob?.cancel()
+        countryJobs.values.forEach { it.cancel() }
 
         return viewModelScope.launch(ioDispatcher) {
             try {
@@ -478,6 +509,7 @@ class MainViewModel(
                     )
                 }
                 groups.forEach { mutableServerGroupState(it.id) }
+                refreshSelectedServerInfo()
 
                 if (groups.isEmpty()) {
                     cacheMutex.withLock { groupDataCache.clear() }
@@ -779,10 +811,26 @@ class MainViewModel(
     fun updateSelectedGuid(guid: String) {
         dataSource.setSelectServer(guid)
         _uiState.update { it.copy(selectedGuid = guid) }
+        refreshSelectedServerInfo()
     }
 
     fun refreshSelectedGuid() {
         _uiState.update { it.copy(selectedGuid = dataSource.getSelectServer()) }
+        refreshSelectedServerInfo()
+    }
+
+    private fun refreshSelectedServerInfo() {
+        val guid = _uiState.value.selectedGuid
+        viewModelScope.launch(ioDispatcher) {
+            val profile = guid?.let(dataSource::decodeServerConfig)
+            val delay = guid?.let(dataSource::decodeAffiliationInfo)?.testDelayMillis ?: 0L
+            _uiState.update { state ->
+                if (state.selectedGuid != guid) state else state.copy(
+                    selectedServerLabel = profile?.remarks,
+                    selectedServerDelayMillis = delay,
+                )
+            }
+        }
     }
 
     fun removeServerAndRefresh(guid: String) {
@@ -919,7 +967,7 @@ class MainViewModel(
             }
             val target = LocateTarget(groupId, selected)
             _uiState.update {
-                it.copy(selectedGroupId = groupId, locateTarget = target)
+                it.copy(selectedGroupId = groupId, locateTarget = target, showingSubscriptions = false)
             }
         }
     }
@@ -942,6 +990,8 @@ class MainViewModel(
     }
 
     override fun onCleared() {
+        countryJobs.values.forEach { it.cancel() }
+        countryJobs.clear()
         setupGroupJob?.cancel()
         preloadJob?.cancel()
         selectedGroupLoadJob?.cancel()

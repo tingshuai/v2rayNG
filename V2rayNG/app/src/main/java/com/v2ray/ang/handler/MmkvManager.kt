@@ -493,6 +493,7 @@ object MmkvManager {
         }
         val aff = decodeServerAffiliationInfo(guid) ?: ServerAffiliationInfo()
         aff.testDelayMillis = testResult
+        aff.lastTestAt = System.currentTimeMillis()
         serverAffStorage.encode(guid, JsonUtil.toJson(aff))
     }
 
@@ -505,6 +506,7 @@ object MmkvManager {
         keys?.forEach { key ->
             decodeServerAffiliationInfo(key)?.let { aff ->
                 aff.testDelayMillis = 0
+                aff.lastTestAt = 0L
                 serverAffStorage.encode(key, JsonUtil.toJson(aff))
             }
         }

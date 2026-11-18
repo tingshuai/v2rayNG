@@ -577,4 +577,22 @@
     <string name="free_node_policy_group_name">انتخاب خودکار گرهٔ رایگان</string>
     <string name="free_node_feedback_title">Anonymous probe feedback</string>
     <string name="free_node_feedback_summary">Only coarse results and latency ranges are sent after network validation. No configuration or device ID is sent.</string>
+    <string name="fn21_subscriptions">اشتراک‌ها</string>
+    <string name="fn21_counts">%1$d گره · %2$d سالم · %3$d ناموفق · %4$d آزمایش‌نشده</string>
+    <string name="fn21_free_fixed">غیرقابل حذف</string>
+    <string name="fn21_back">بازگشت</string>
+    <string name="fn21_subscription_summary">%1$s: %2$d گره، %3$d سالم، %4$d ناموفق، %5$d آزمایش‌نشده</string>
+    <string name="fn21_last_test">آخرین آزمایش واقعی: %1$s</string>
+    <string name="fn21_unknown_region">منطقه نامشخص</string>
+    <string name="fn21_untested">آزمایش‌نشده</string>
+    <string name="fn21_failed">ناموفق</string>
+    <string name="fn21_free_subtitle">فهرست گزینه‌ها · به‌روزرسانی خودکار</string>
+    <string name="fn21_user_subtitle">اشتراک ذخیره شد · به‌روزرسانی طبق تنظیمات</string>
+    <string name="fn21_node_summary">%1$d گره · %2$d آزمایش‌شده</string>
+    <string name="fn21_healthy">سالم</string>
+    <string name="fn21_node_semantics">%1$s، %2$s، %3$s</string>
+    <string name="fn21_search_nodes">جستجوی گره یا کشور</string>
+    <string name="fn21_bottom_status">%1$s · %2$d میلی‌ثانیه</string>
+    <string name="fn21_manual_import">واردکردن دستی</string>
+    <string name="fn21_manual_subtitle">گره‌های محلی · بدون به‌روزرسانی خودکار</string>
 </resources>

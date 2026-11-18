@@ -207,13 +207,13 @@ fun SubSettingScreen(
                                             )
                                         }
                                     }
-                                    IconButton(onClick = { onEditSub(subCache.guid) }) {
+                                    if (subCache.guid != AppConfig.FREE_NODE_SUBSCRIPTION_ID) IconButton(onClick = { onEditSub(subCache.guid) }) {
                                         Icon(
                                             painter = painterResource(R.drawable.ic_edit_24dp),
                                             contentDescription = stringResource(R.string.acc_edit)
                                         )
                                     }
-                                    IconButton(onClick = {
+                                    if (subCache.guid != AppConfig.FREE_NODE_SUBSCRIPTION_ID) IconButton(onClick = {
                                         if (confirmRemove) removeTarget = SubscriptionDeleteTarget(subCache.guid, subCache.subscription.remarks)
                                         else onRemoveSub(subCache.guid)
                                     }) {
@@ -224,7 +224,7 @@ fun SubSettingScreen(
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Switch(
+                                if (subCache.guid != AppConfig.FREE_NODE_SUBSCRIPTION_ID) Switch(
                                     checked = subCache.subscription.enabled,
                                     onCheckedChange = { checked ->
                                         val updated = subCache.subscription.copy()

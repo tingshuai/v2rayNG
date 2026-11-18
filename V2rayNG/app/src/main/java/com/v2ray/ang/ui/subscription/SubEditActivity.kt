@@ -77,6 +77,7 @@ class SubEditActivity : BaseComponentActivity() {
     }
 
     private fun saveServer(subItem: SubscriptionItem): Boolean {
+        if (editSubId == AppConfig.FREE_NODE_SUBSCRIPTION_ID) return false
         if (TextUtils.isEmpty(subItem.remarks)) {
             return false
         }
@@ -102,6 +103,7 @@ class SubEditActivity : BaseComponentActivity() {
     }
 
     private fun deleteServer(): Boolean {
+        if (editSubId == AppConfig.FREE_NODE_SUBSCRIPTION_ID) return false
         if (editSubId.isNotEmpty()) {
             lifecycleScope.launch(Dispatchers.IO) {
                 SettingsManager.removeSubscriptionWithDefault(editSubId)

@@ -585,4 +585,22 @@
     <string name="free_node_policy_group_name">اختيار العُقد المجانية تلقائياً</string>
     <string name="free_node_feedback_title">إرسال ملاحظات اختبار مجهولة</string>
     <string name="free_node_feedback_summary">بعد التحقق من اتصال الشبكة، تُرسل النتائج العامة ونطاقات زمن الاستجابة فقط. لا يُرسل الإعداد أو معرّف الجهاز.</string>
+    <string name="fn21_subscriptions">الاشتراكات</string>
+    <string name="fn21_counts">%1$d عقد · %2$d تعمل · %3$d فشلت · %4$d غير مختبرة</string>
+    <string name="fn21_free_fixed">لا يمكن الحذف</string>
+    <string name="fn21_back">رجوع</string>
+    <string name="fn21_subscription_summary">%1$s: %2$d عقد، %3$d تعمل، %4$d فشلت، %5$d غير مختبرة</string>
+    <string name="fn21_last_test">آخر اختبار فعلي: %1$s</string>
+    <string name="fn21_unknown_region">منطقة غير معروفة</string>
+    <string name="fn21_untested">غير مختبر</string>
+    <string name="fn21_failed">فشل</string>
+    <string name="fn21_free_subtitle">قائمة المرشحين · تحديث تلقائي</string>
+    <string name="fn21_user_subtitle">الاشتراك محفوظ · تحديث حسب الإعدادات</string>
+    <string name="fn21_node_summary">%1$d عقد · تم اختبار %2$d</string>
+    <string name="fn21_healthy">تعمل</string>
+    <string name="fn21_node_semantics">%1$s، %2$s، %3$s</string>
+    <string name="fn21_search_nodes">ابحث عن عقدة أو بلد</string>
+    <string name="fn21_bottom_status">%1$s · %2$d مللي ثانية</string>
+    <string name="fn21_manual_import">استيراد يدوي</string>
+    <string name="fn21_manual_subtitle">عقد محلية · بلا تحديث تلقائي</string>
 </resources>

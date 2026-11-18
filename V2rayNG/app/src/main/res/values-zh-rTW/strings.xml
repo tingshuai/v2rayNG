@@ -575,4 +575,22 @@
     <string name="free_node_policy_group_name">免費節點自動選擇</string>
     <string name="free_node_feedback_title">傳送匿名探測回饋</string>
     <string name="free_node_feedback_summary">網路確認可用後，只傳送概略結果和延遲範圍，不傳送節點設定或裝置識別碼。</string>
+    <string name="fn21_subscriptions">訂閱列表</string>
+    <string name="fn21_counts">%1$d 個節點 · %2$d 個正常 · %3$d 個失敗 · %4$d 個未測試</string>
+    <string name="fn21_free_fixed">不可刪除</string>
+    <string name="fn21_back">返回</string>
+    <string name="fn21_subscription_summary">%1$s：%2$d 個節點，%3$d 個正常，%4$d 個失敗，%5$d 個未測試</string>
+    <string name="fn21_last_test">最近真實測試：%1$s</string>
+    <string name="fn21_unknown_region">未知地區</string>
+    <string name="fn21_untested">未測試</string>
+    <string name="fn21_failed">連線失敗</string>
+    <string name="fn21_free_subtitle">候選列表 · 自動更新</string>
+    <string name="fn21_user_subtitle">訂閱網址已儲存 · 依設定自動更新</string>
+    <string name="fn21_node_summary">%1$d 個節點 · 已測 %2$d 個</string>
+    <string name="fn21_healthy">連線正常</string>
+    <string name="fn21_node_semantics">%1$s，%2$s，%3$s</string>
+    <string name="fn21_search_nodes">搜尋節點或國家</string>
+    <string name="fn21_bottom_status">%1$s · %2$d 毫秒</string>
+    <string name="fn21_manual_import">手動匯入</string>
+    <string name="fn21_manual_subtitle">本機節點 · 不自動更新</string>
 </resources>

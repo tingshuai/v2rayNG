@@ -44,6 +44,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainBottomBar(
     displayText: String,
+    selectedServerLabel: String?,
+    selectedServerDelayMillis: Long,
     isRunning: Boolean,
     isDarkTheme: Boolean,
     onAction: (MainAction) -> Unit
@@ -74,13 +76,17 @@ fun MainBottomBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = displayText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.semantics {
-                        contentDescription = displayText
+                Column {
+                    selectedServerLabel?.let { label ->
+                        Text(label, style = MaterialTheme.typography.bodyMedium)
                     }
-                )
+                    Text(
+                        text = if (selectedServerDelayMillis > 0L) {
+                            stringResource(R.string.fn21_bottom_status, displayText, selectedServerDelayMillis)
+                        } else displayText,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
         FloatingActionButton(
