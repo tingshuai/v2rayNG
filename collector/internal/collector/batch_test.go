@@ -329,6 +329,72 @@ func TestScreenSourcesSharesGlobalProbeConcurrency(t *testing.T) {
 	}
 }
 
+func TestDuplicateCandidateAcrossSourcesIsFullyProbedOnlyOnce(t *testing.T) {
+	const candidate = "trojan://credential@shared.example:443"
+	var checks atomic.Int32
+	runner := BatchRunner{
+		Fetcher:          sourceFetcherFunc(func(context.Context, Source) ([]byte, error) { return []byte(candidate), nil }),
+		FetchConcurrency: 2,
+		TCPConcurrency:   2,
+		Prober:           successfulProber{},
+		TCPChecker: func(context.Context, Resolver, string) error {
+			checks.Add(1)
+			return nil
+		},
+	}
+	results := runner.screenSources(context.Background(), []Source{{ID: "one"}, {ID: "two"}})
+	for range results {
+	}
+	if got := checks.Load(); got != 1 {
+		t.Fatalf("full probe count = %d, want exactly one for duplicate candidate", got)
+	}
+}
+
+func TestScreeningKeepsCandidateAfterProbeFailureForAnotherSource(t *testing.T) {
+	const candidate = "trojan://credential@shared.example:443"
+	var checks atomic.Int32
+	runner := BatchRunner{
+		Fetcher:          sourceFetcherFunc(func(context.Context, Source) ([]byte, error) { return []byte(candidate), nil }),
+		FetchConcurrency: 1,
+		TCPConcurrency:   1,
+		Prober:           successfulProber{},
+		TCPChecker: func(context.Context, Resolver, string) error {
+			if checks.Add(1) == 1 {
+				return errors.New("transient probe failure")
+			}
+			return nil
+		},
+	}
+	results := runner.screenSources(context.Background(), []Source{{ID: "one"}, {ID: "two"}})
+	accepted := 0
+	for result := range results {
+		accepted += len(result.candidates)
+	}
+	if got := checks.Load(); got != 2 || accepted != 1 {
+		t.Fatalf("full probe count=%d accepted=%d; want two attempts and one accepted candidate", got, accepted)
+	}
+}
+
+func TestDuplicateCandidateAfterSuccessfulProbeIsSkippedForAnotherSource(t *testing.T) {
+	const candidate = "trojan://credential@shared.example:443"
+	var checks atomic.Int32
+	runner := BatchRunner{
+		Fetcher:          sourceFetcherFunc(func(context.Context, Source) ([]byte, error) { return []byte(candidate), nil }),
+		FetchConcurrency: 1,
+		TCPConcurrency:   1,
+		Prober:           successfulProber{},
+		TCPChecker:       func(context.Context, Resolver, string) error { checks.Add(1); return nil },
+	}
+	results := runner.screenSources(context.Background(), []Source{{ID: "one"}, {ID: "two"}})
+	accepted := 0
+	for result := range results {
+		accepted += len(result.candidates)
+	}
+	if got := checks.Load(); got != 1 || accepted != 1 {
+		t.Fatalf("full probe count=%d accepted=%d; want one probe and one accepted candidate", got, accepted)
+	}
+}
+
 func TestScreenSourcesUsesOneSharedBatchProbeBudget(t *testing.T) {
 	var checks atomic.Int32
 	runner := BatchRunner{

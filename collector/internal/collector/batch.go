@@ -352,7 +352,9 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 				candidateFingerprint := fingerprint(runner.FingerprintKey, candidate)
 				seenMutex.Lock()
 				_, exists := seen[candidateFingerprint]
-				seen[candidateFingerprint] = struct{}{}
+				if !exists {
+					seen[candidateFingerprint] = struct{}{}
+				}
 				seenMutex.Unlock()
 				if exists {
 					continue
@@ -382,6 +384,7 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 					cancel()
 					<-probeSlots
 					if err == nil {
+						// A duplicate source may retry a transient failure; successful probes remain de-duplicated.
 						if recordErr := runner.recordCandidateProbe(candidate, true); recordErr != nil {
 							slog.Error("record successful candidate probe", "component", "batch", "candidate_id", fingerprint(runner.FingerprintKey, candidate), "error", recordErr)
 						}
@@ -390,11 +393,17 @@ func (runner BatchRunner) screenCandidates(ctx context.Context, candidates []str
 						case <-ctx.Done():
 						}
 					} else if failure, ok := err.(probeFailure); ok {
+						seenMutex.Lock()
+						delete(seen, candidateFingerprint)
+						seenMutex.Unlock()
 						if recordErr := runner.recordCandidateProbe(candidate, false); recordErr != nil {
 							slog.Error("record failed candidate probe", "component", "batch", "candidate_id", fingerprint(runner.FingerprintKey, candidate), "error", recordErr)
 						}
 						failures <- failure.category
 					} else {
+						seenMutex.Lock()
+						delete(seen, candidateFingerprint)
+						seenMutex.Unlock()
 						if recordErr := runner.recordCandidateProbe(candidate, false); recordErr != nil {
 							slog.Error("record failed candidate probe", "component", "batch", "candidate_id", fingerprint(runner.FingerprintKey, candidate), "error", recordErr)
 						}

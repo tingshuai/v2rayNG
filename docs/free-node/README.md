@@ -14,6 +14,7 @@
 - [来源审查记录](source-review.md)：接入、弃用和重新评估来源的可复核决定。
 - [数据保留与威胁模型](threat-model.md)：风险、隐私和日志规则。
 - [Android 状态与选择设计](android-selection.md)：客户端测试、排序、隔离、切换逻辑及 FN-2.1 首页与节点列表。
+- TalkBack 语音验收依产品决定不纳入本阶段；真实代理链路由用户手动验收，后续自动验收时应尝试用测试手机的 Google Chrome 打开普通网页，详见上项 Android 文档。
 - [旧方案试运行记录](p4-end-to-end-trial.md)：历史证据，不代表 FN-2.0 已验收。
 - [上游同步清单](upstream-sync-checklist.md)：同步 v2rayNG 上游时的检查步骤。
 

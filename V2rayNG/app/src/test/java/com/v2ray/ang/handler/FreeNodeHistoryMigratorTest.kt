@@ -91,4 +91,34 @@ class FreeNodeHistoryMigratorTest {
             FreeNodeHistoryMigrator.revokedFingerprints(state, setOf(revokedId)),
         )
     }
+
+    @Test
+    fun `retention excludes future dated success and keeps newest sixteen only`() {
+        val now = 10_000_000L
+        val profiles = (1..18).map { index -> ProfileItem.create(EConfigType.VLESS).apply { remarks = "candidate-$index" } }
+        val ids = profiles.mapIndexed { index, profile -> profile.remarks to "candidate-${index + 1}" }.toMap()
+        val histories = ids.entries.associate { (name, fingerprint) ->
+            fingerprint to FreeNodeHistory(lastSuccessAt = now - name.substringAfter('-').toLong(), successCount = 1)
+        }.toMutableMap()
+        histories["candidate-18"] = FreeNodeHistory(lastSuccessAt = now + 1, successCount = 1)
+        val state = FreeNodeHistoryState(entries = histories)
+
+        val retained = FreeNodeHistoryMigrator.recentlyValidatedProfiles(state, profiles, emptyList(), { ids.getValue(it.remarks) }, now)
+
+        assertEquals((1..16).map { "candidate-$it" }, retained.map { it.remarks })
+    }
+
+    @Test
+    fun `selection migration clears selected id when its profile disappears`() {
+        val retained = ProfileItem.create(EConfigType.VLESS)
+        val state = FreeNodeHistoryState(
+            entries = mapOf("kept" to FreeNodeHistory(successCount = 1), "removed" to FreeNodeHistory(successCount = 1)),
+            selectedFingerprint = "removed",
+        )
+
+        val migrated = FreeNodeHistoryMigrator.migrate(state, listOf(retained)) { "kept" }
+
+        assertEquals("kept", migrated.entries.keys.single())
+        assertEquals(null, migrated.selectedFingerprint)
+    }
 }

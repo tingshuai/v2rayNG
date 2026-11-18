@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+func timePointer(value time.Time) *time.Time { return &value }
+
 func TestThirdFailedRunPausesSourceAndExplicitEnableRestoresIt(t *testing.T) {
 	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
 	if err != nil {
@@ -253,6 +255,71 @@ func TestCandidateRetentionRequiresSuccessfulSourceInventoryAbsence(t *testing.T
 	}
 	if err := store.db.QueryRow("SELECT COUNT(*) FROM candidate_fingerprints WHERE fingerprint='candidate-old'").Scan(&count); err != nil || count != 0 {
 		t.Fatalf("candidate after every source confirms absence = %d, err=%v; want deleted", count, err)
+	}
+}
+
+func TestSourceFetchCadencesAndInventoriesRemainIndependent(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	fast := Source{ID: "fast", MinFetchInterval: time.Hour, LastSuccessAt: timePointer(now.Add(-time.Hour))}
+	slow := Source{ID: "slow", MinFetchInterval: 24 * time.Hour, LastSuccessAt: timePointer(now.Add(-time.Hour))}
+	if !fast.IsDue(now) || slow.IsDue(now) {
+		t.Fatalf("different cadence due states: fast=%v slow=%v", fast.IsDue(now), slow.IsDue(now))
+	}
+	for _, source := range []Source{fast, slow} {
+		if err := store.RegisterSource(ctx, SourceRegistration{ID: source.ID, FetchURL: "https://" + source.ID + ".example/feed", MinFetchInterval: source.MinFetchInterval}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.RecordSourceCandidates(ctx, fast.ID, []string{"fast-only", "shared"}, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordSourceCandidates(ctx, slow.ID, []string{"slow-only", "shared"}, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordSourceCandidates(ctx, fast.ID, []string{"fast-only"}, now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	sources, err := store.CandidateSources(ctx, []string{"fast-only", "slow-only", "shared"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(sources["fast-only"], ",") != fast.ID || strings.Join(sources["slow-only"], ",") != slow.ID || strings.Join(sources["shared"], ",") != "fast,slow" {
+		t.Fatalf("source inventories after fast refresh = %#v", sources)
+	}
+}
+
+func TestFailedSourceRunDoesNotReplacePriorCandidateInventory(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	registration := SourceRegistration{ID: "source-stable", FetchURL: "https://source.example/feed", MinFetchInterval: time.Minute}
+	if err := store.RegisterSource(ctx, registration); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordSourceCandidates(ctx, registration.ID, []string{"retained-candidate"}, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RecordRun(ctx, registration.ID, RunFailed, 0, "fetch_failed"); err != nil {
+		t.Fatal(err)
+	}
+	sources, err := store.CandidateSources(ctx, []string{"retained-candidate"})
+	if err != nil || len(sources["retained-candidate"]) != 1 || sources["retained-candidate"][0] != registration.ID {
+		t.Fatalf("source association after failed fetch = %#v, err=%v", sources, err)
 	}
 }
 
