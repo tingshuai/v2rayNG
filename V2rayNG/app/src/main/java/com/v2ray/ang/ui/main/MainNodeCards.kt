@@ -26,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +52,16 @@ import com.v2ray.ang.dto.entities.SubscriptionUsageInfo
 import com.v2ray.ang.ui.compose.LocalDarkTheme
 import java.util.Locale
 
+internal enum class LatencyTone { UNKNOWN, FAST, MODERATE, SLOW, FAILED }
+
+internal fun latencyTone(delayMillis: Long): LatencyTone = when {
+    delayMillis < 0L -> LatencyTone.FAILED
+    delayMillis == 0L -> LatencyTone.UNKNOWN
+    delayMillis <= 200L -> LatencyTone.FAST
+    delayMillis <= 500L -> LatencyTone.MODERATE
+    else -> LatencyTone.SLOW
+}
+
 @Composable
 internal fun NodeCardsContent(
     groupId: String,
@@ -66,8 +75,6 @@ internal fun NodeCardsContent(
     onRefresh: () -> Unit,
     selectedCountryCode: String?,
     onFilterCountry: (String?) -> Unit,
-    searchQuery: String,
-    onSearch: (String) -> Unit,
     onSelect: (String) -> Unit,
     onEdit: (String, ProfileItem) -> Unit,
     onShare: (String, ProfileItem) -> Unit,
@@ -87,22 +94,13 @@ internal fun NodeCardsContent(
     LaunchedEffect(locateTarget, visibleRows) {
         if (locateTarget?.groupId == groupId) {
             val index = visibleRows.indexOfFirst { it.guid == locateTarget.serverGuid }
-            if (index >= 0) listState.animateScrollToItem(index + 3 + if (usageInfo == null) 0 else 1)
+            if (index >= 0) listState.animateScrollToItem(index + 2 + if (usageInfo == null) 0 else 1)
             onLocateHandled()
         }
     }
     LazyColumn(state = listState, modifier = modifier.imePadding(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (usageInfo != null) item {
             SubscriptionInfoCard(info = usageInfo, fallbackTitle = groupTitle, onOpenLink = onOpenLink, onRefresh = onRefresh)
-        }
-        item {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearch,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                label = { Text(stringResource(R.string.fn21_search_nodes)) },
-                singleLine = true,
-            )
         }
         item {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -132,6 +130,17 @@ internal fun NodeCardsContent(
                 else -> stringResource(R.string.fn21_untested)
             }
             val semanticLabel = stringResource(R.string.fn21_node_semantics, row.remarks, row.typeDescription, status)
+            val statusColor = when {
+                row.testDelayMillis > 0L -> MaterialTheme.colorScheme.tertiary
+                row.testDelayMillis < 0L -> MaterialTheme.colorScheme.error
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            val delayColor = when (latencyTone(row.testDelayMillis)) {
+                LatencyTone.FAST -> MaterialTheme.colorScheme.tertiary
+                LatencyTone.MODERATE -> MaterialTheme.colorScheme.secondary
+                LatencyTone.SLOW, LatencyTone.FAILED -> MaterialTheme.colorScheme.error
+                LatencyTone.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
             Card(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
                     .semantics { selected = isSelected }
@@ -142,13 +151,17 @@ internal fun NodeCardsContent(
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.padding(end = 10.dp).size(24.dp).background(
-                            if (isSelected) selectedBorder else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            if (row.testDelayMillis == 0L) MaterialTheme.colorScheme.surfaceContainerHigh else statusColor,
                             CircleShape,
                         ), contentAlignment = Alignment.Center) {
-                            Text(if (isSelected) "✓" else if (row.testDelayMillis < 0) "×" else "•", color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                if (row.testDelayMillis > 0L) "✓" else if (row.testDelayMillis < 0L) "×" else "?",
+                                color = if (row.testDelayMillis == 0L) statusColor else if (row.testDelayMillis > 0L) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onError,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
                         }
                         Text(row.remarks, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(status, style = MaterialTheme.typography.labelSmall, color = if (row.testDelayMillis < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+                        Text(status, style = MaterialTheme.typography.labelSmall, color = statusColor)
                         NodeCardMenu(row, onEdit, onShare, onRemove)
                     }
                     Spacer(Modifier.size(4.dp))
@@ -163,7 +176,7 @@ internal fun NodeCardsContent(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(if (row.testDelayMillis > 0L) stringResource(R.string.server_test_delay_value, row.testDelayMillis) else status, Modifier.weight(0.8f), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(if (row.testDelayMillis > 0L) stringResource(R.string.server_test_delay_value, row.testDelayMillis) else status, Modifier.weight(0.8f), style = MaterialTheme.typography.bodySmall, color = delayColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }

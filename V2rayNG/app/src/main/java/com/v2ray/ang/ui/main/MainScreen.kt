@@ -48,6 +48,7 @@ fun MainScreen(
     var searchQuery by remember { mutableStateOf("") }
     BackHandler(enabled = !uiState.showingSubscriptions) {
         searchQuery = ""
+        showSearch = false
         onAction(MainAction.Search(""))
         onAction(MainAction.CloseSubscription)
     }
@@ -116,6 +117,13 @@ fun MainScreen(
                     title = if (uiState.showingSubscriptions) stringResource(R.string.fn21_subscriptions)
                     else if (uiState.selectedGroupId == AppConfig.DEFAULT_SUBSCRIPTION_ID) stringResource(R.string.fn21_manual_import)
                     else groups.firstOrNull { it.id == uiState.selectedGroupId }?.remarks.orEmpty(),
+                    showBack = !uiState.showingSubscriptions,
+                    onBackClick = {
+                        searchQuery = ""
+                        showSearch = false
+                        onAction(MainAction.Search(""))
+                        onAction(MainAction.CloseSubscription)
+                    },
                     isLoading = isLoading,
                     showSearch = showSearch,
                     searchQuery = searchQuery,
@@ -164,7 +172,7 @@ fun MainScreen(
                     groups = groups,
                     mainViewModel = mainViewModel,
                     selectedGroupId = uiState.selectedGroupId,
-                    onOpen = { searchQuery = ""; onAction(MainAction.Search("")); onAction(MainAction.OpenSubscription(it)) },
+                    onOpen = { searchQuery = ""; showSearch = false; onAction(MainAction.Search("")); onAction(MainAction.OpenSubscription(it)) },
                     onManage = { onNavigate(MainDestination.Subscriptions) },
                     onUpdate = { onAction(MainAction.UpdateGroupSubscription(it)) },
                     modifier = Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding),
@@ -182,8 +190,6 @@ fun MainScreen(
                     onRefresh = { onAction(MainAction.UpdateGroupSubscription(uiState.selectedGroupId)) },
                     selectedCountryCode = uiState.selectedCountryCode,
                     onFilterCountry = { onAction(MainAction.FilterCountry(it)) },
-                    searchQuery = searchQuery,
-                    onSearch = { query -> searchQuery = query; onAction(MainAction.Search(query)) },
                     onSelect = { onAction(MainAction.SelectServer(it)) },
                     onEdit = { guid, profile -> onAction(MainAction.EditServer(guid, profile)) },
                     onShare = { guid, profile -> shareTarget = Triple(guid, profile, false) },

@@ -30,6 +30,8 @@ import com.v2ray.ang.ui.compose.verticalScrollbar
 @Composable
 fun MainTopBar(
     title: String,
+    showBack: Boolean,
+    onBackClick: () -> Unit,
     isLoading: Boolean,
     showSearch: Boolean,
     searchQuery: String,
@@ -50,16 +52,20 @@ fun MainTopBar(
 
     AppTopBar(
         title = title,
-        onBackClick = {},
+        onBackClick = onBackClick,
         isLoading = isLoading,
         isSearchActive = showSearch,
         searchQuery = searchQuery,
         onSearchQueryChange = onSearchQueryChange,
         onSearchClose = onSearchClose,
-        searchPlaceholder = stringResource(R.string.menu_item_search),
+        searchPlaceholder = stringResource(R.string.fn21_search_nodes),
         navigationIcon = {
             if (showSearch) {
                 IconButton(onClick = onSearchClose) {
+                    Icon(painterResource(R.drawable.ic_arrow_back_24dp), contentDescription = stringResource(R.string.acc_back))
+                }
+            } else if (showBack) {
+                IconButton(onClick = onBackClick) {
                     Icon(painterResource(R.drawable.ic_arrow_back_24dp), contentDescription = stringResource(R.string.acc_back))
                 }
             } else {
@@ -69,7 +75,7 @@ fun MainTopBar(
             }
         },
         actions = {
-            if (!showSearch) {
+            if (!showSearch && showBack) {
                 IconButton(onClick = { onSearchToggle(true) }) {
                     Icon(painterResource(R.drawable.ic_search_24dp), contentDescription = stringResource(R.string.acc_search))
                 }

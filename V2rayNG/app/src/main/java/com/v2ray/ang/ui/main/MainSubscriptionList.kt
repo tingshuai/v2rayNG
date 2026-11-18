@@ -2,7 +2,6 @@ package com.v2ray.ang.ui.main
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,7 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -82,9 +81,9 @@ internal fun SubscriptionListContent(
             val isSelected = group.id == selectedGroupId
             val label = stringResource(R.string.fn21_subscription_summary, title, counts.total, counts.healthy, counts.failed, counts.untested)
             Card(
+                onClick = { onOpen(group.id) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
-                    .semantics { selected = isSelected }
-                    .clickable(role = Role.Button, onClickLabel = label) { onOpen(group.id) },
+                    .semantics { selected = isSelected; contentDescription = label },
                 colors = CardDefaults.cardColors(containerColor = if (isSelected) selectedBackground else MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, if (isSelected) selectedBorder else MaterialTheme.colorScheme.outlineVariant),
             ) {

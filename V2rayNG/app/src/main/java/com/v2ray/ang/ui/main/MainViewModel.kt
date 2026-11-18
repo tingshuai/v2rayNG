@@ -41,7 +41,30 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
+import java.util.Locale
 import java.util.regex.PatternSyntaxException
+
+internal fun serverMatchesSearch(
+    profile: ProfileItem,
+    countryCode: String?,
+    keyword: String,
+    locale: Locale = Locale.getDefault(),
+): Boolean {
+    val query = keyword.trim()
+    if (query.isEmpty()) return true
+    val country = countryCode?.let { Locale.Builder().setRegion(it).build() }
+    val values = listOfNotNull(
+        profile.remarks,
+        profile.description,
+        profile.server,
+        profile.configType.name,
+        countryCode,
+        country?.getDisplayCountry(locale),
+        country?.getDisplayCountry(Locale.ENGLISH),
+    )
+    val regex = try { Regex(query, RegexOption.IGNORE_CASE) } catch (_: PatternSyntaxException) { null }
+    return values.any { it.matchesPattern(regex, query) }
+}
 
 private fun applyTestDelayResults(
     servers: List<ServersCache>,
@@ -385,39 +408,33 @@ class MainViewModel(
         }
     }
 
-    private fun applyKeywordFilter(servers: List<ServersCache>): List<ServersCache> {
+    private fun applyKeywordFilter(servers: List<ServersCache>, countryByGuid: Map<String, String>): List<ServersCache> {
         val keyword = keywordFilter.trim()
         if (keyword.isEmpty()) return servers
-        val regex = try {
-            Regex(keyword, RegexOption.IGNORE_CASE)
-        } catch (_: PatternSyntaxException) {
-            return servers
-        }
-        return servers.filter { cache ->
-            val profile = cache.profile
-            profile.remarks.matchesPattern(regex, keyword) ||
-                    profile.description.orEmpty().matchesPattern(regex, keyword) ||
-                    profile.server.orEmpty().matchesPattern(regex, keyword) ||
-                    profile.configType.name.matchesPattern(regex, keyword)
-        }
+        return servers.filter { serverMatchesSearch(it.profile, countryByGuid[it.guid], keyword) }
     }
 
     private fun updateGroupUi(groupId: String, servers: List<ServersCache>) {
-        val filteredServers = applyKeywordFilter(servers)
+        val knownCountries = mutableServerGroupState(groupId).value.countryByGuid
+        val filteredServers = applyKeywordFilter(servers, knownCountries)
         mutableServerGroupState(groupId).value = ServerGroupUiState(
             servers = filteredServers,
-            rows = buildServerRows(groupId, filteredServers)
+            rows = buildServerRows(groupId, filteredServers),
+            countryByGuid = knownCountries,
         )
         countryJobs.remove(groupId)?.cancel()
         countryJobs[groupId] = viewModelScope.launch(defaultDispatcher) {
             try {
-                val addresses = filteredServers.mapNotNull { it.profile.server }.distinct()
+                val addresses = servers.mapNotNull { it.profile.server }.distinct()
                 val countries = geoIpResolver.resolve(addresses)
-                val byGuid = filteredServers.mapNotNull { server ->
+                val byGuid = servers.mapNotNull { server ->
                     countries[server.profile.server]?.let { server.guid to it }
                 }.toMap()
                 mutableServerGroupState(groupId).update { current ->
-                    if (current.servers.map { it.guid } == filteredServers.map { it.guid }) current.copy(countryByGuid = byGuid)
+                    if (current.servers.map { it.guid } == filteredServers.map { it.guid }) {
+                        val matched = applyKeywordFilter(servers, byGuid)
+                        current.copy(servers = matched, rows = buildServerRows(groupId, matched), countryByGuid = byGuid)
+                    }
                     else current
                 }
             } catch (cancelled: CancellationException) {
