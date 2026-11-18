@@ -86,18 +86,16 @@ incompatible actions; every other root rule remains active.
 - Keep local-only text unstaged and uncommitted. Never use `git add .`, `git add -A`, or
   `git commit -a` in that worktree. Stage task paths explicitly; never delete, restore, or overwrite
   local instructions to clean the worktree.
-- Before each commit, push, or PR update outside agent-instruction scope, run both commands. Both
-  must print no paths; otherwise stop and remove the instruction change from the staged or branch
-  diff without altering its working copy.
+- Before each commit, push, or PR update outside agent-instruction scope, check the staged changes
+  and the changes introduced by the current task against the branch base. They must not include
+  instruction-file changes. Pre-existing instruction-file differences in branch history do not
+  block unrelated work; preserve them as local-only text and do not add new instruction-file
+  changes to a feature commit. For an agent-instruction task, stage only the explicitly targeted
+  instruction files and necessary routing-shim changes.
 
   ```sh
   git diff --cached --name-only -- ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' ':(glob)**/GEMINI.md' .github/copilot-instructions.md
-  git diff --name-only upstream/master...HEAD -- ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' ':(glob)**/GEMINI.md' .github/copilot-instructions.md
   ```
-
-- Commit instruction files only for a task explicitly limited to agent instructions. The branch
-  and PR may contain only `AGENTS.md` and necessary routing-shim changes; name agent instructions
-  in the PR title and state that exclusive scope in the body.
 
 ## Project boundaries
 
