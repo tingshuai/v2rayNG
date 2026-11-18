@@ -35,6 +35,7 @@ object AngConfigManager {
     private data class ParsedProfile(
         val profile: ProfileItem,
         val rawConfig: String? = null,
+        val remoteCandidateId: String? = null,
     )
 
     // Parser mapping for different config types (lazy initialized)
@@ -241,7 +242,7 @@ object AngConfigManager {
      * @param append Whether to append the configurations.
      * @return The number of configurations parsed.
      */
-    private fun parseBatchConfig(servers: String?, subid: String, append: Boolean): Int {
+    private fun parseBatchConfig(servers: String?, subid: String, append: Boolean, candidateIds: Map<String, String> = emptyMap()): Int {
         try {
             if (servers == null) {
                 return 0
@@ -249,7 +250,7 @@ object AngConfigManager {
             val subItem = MmkvManager.decodeSubscription(subid)
 
             // Parse all configs first (no I/O during parsing)
-            val configs = mutableListOf<ProfileItem>()
+            val configs = mutableListOf<ParsedProfile>()
             val v2raynLines = mutableListOf<String>()
 
             servers.lines()
@@ -261,17 +262,17 @@ object AngConfigManager {
                     } else {
                         val config = parseConfig(it, subid, subItem)
                         if (config != null) {
-                            configs.add(config)
+                            configs.add(ParsedProfile(config, remoteCandidateId = candidateIds[it]))
                         }
                     }
                 }
 
             val v2raynConfigs = V2rayNFmt.parse(v2raynLines, subid)
-            val allConfigs = v2raynConfigs + configs
+            val allConfigs = v2raynConfigs.map(::ParsedProfile) + configs
 
             if (allConfigs.isNotEmpty()) {
                 commitProfiles(
-                    configs = allConfigs.map(::ParsedProfile),
+                    configs = allConfigs,
                     subid = subid,
                     append = append,
                 )
@@ -320,7 +321,10 @@ object AngConfigManager {
             append = append,
         )
         if (!append && FreeNodeManager.isDedicatedSubscription(subid)) {
-            FreeNodeManager.migrateHistory(keyToProfile.values)
+            val candidateIds = configs.mapNotNull { parsed ->
+                parsed.remoteCandidateId?.let { remoteId -> FreeNodeManager.fingerprint(parsed.profile) to remoteId }
+            }.toMap()
+            FreeNodeManager.migrateHistory(keyToProfile.values, candidateIds)
         }
     }
 
@@ -547,7 +551,20 @@ object AngConfigManager {
                 return SubscriptionUpdateResult(failureCount = 1)
             }
 
-            val count = parseConfigViaSub(configText, it.guid, false)
+            val candidateIds = if (FreeNodeManager.isDedicatedSubscription(it.guid)) {
+                val manifest = FreeNodeFeedManifest.parse(configText) ?: run {
+                    LogUtil.e(AppConfig.TAG, "Free-node manifest validation failed")
+                    return SubscriptionUpdateResult(failureCount = 1)
+                }
+                FreeNodeManager.applyFeedRevocations(manifest.revoked)
+                manifest.candidates.associate { candidate -> candidate.config to candidate.id }
+            } else {
+                emptyMap()
+            }
+            if (FreeNodeManager.isDedicatedSubscription(it.guid)) {
+                configText = candidateIds.keys.joinToString("\n")
+            }
+            val count = parseConfigViaSub(configText, it.guid, false, candidateIds)
             if (count > 0) {
                 it.subscription.lastUpdated = System.currentTimeMillis()
                 // Replaced on every successful update so the box disappears if the panel stops sending the headers.
@@ -560,6 +577,9 @@ object AngConfigManager {
                 )
             } else {
                 // Got response but no valid configs parsed
+                if (FreeNodeManager.isDedicatedSubscription(it.guid)) {
+                    LogUtil.e(AppConfig.TAG, "Free-node manifest contained no importable profiles")
+                }
                 return SubscriptionUpdateResult(failureCount = 1)
             }
         } catch (e: Exception) {
@@ -611,10 +631,10 @@ object AngConfigManager {
      * @param append Whether to append the configurations.
      * @return The number of configurations parsed.
      */
-    private fun parseConfigViaSub(server: String?, subid: String, append: Boolean): Int {
-        var count = parseBatchConfig(Utils.decode(server), subid, append)
+    private fun parseConfigViaSub(server: String?, subid: String, append: Boolean, candidateIds: Map<String, String> = emptyMap()): Int {
+        var count = parseBatchConfig(Utils.decode(server), subid, append, candidateIds)
         if (count <= 0) {
-            count = parseBatchConfig(server, subid, append)
+            count = parseBatchConfig(server, subid, append, candidateIds)
         }
         if (count <= 0) {
             count = parseCustomConfigServer(server, subid, append)

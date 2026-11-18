@@ -576,6 +576,9 @@
     <string name="free_node_risk_message">Бесплатные узлы не заслуживают доверия. Не передавайте через них пароли, платежи или иной конфиденциальный трафик.</string>
     <string name="free_node_enable_confirm">Я понимаю и включаю</string>
     <string name="free_node_enable_failed">Не удалось включить бесплатные узлы.</string>
+    <string name="free_node_no_healthy_candidates">Нет локально проверенных бесплатных узлов. Запустите проверку скорости или попробуйте позже.</string>
     <string name="free_node_subscription_name">Кандидаты бесплатных узлов</string>
     <string name="free_node_policy_group_name">Автовыбор бесплатных узлов</string>
+    <string name="free_node_feedback_title">Отправлять анонимные данные проверки</string>
+    <string name="free_node_feedback_summary">При подтверждённом доступе к интернету отправляются только общие результаты и диапазоны задержки. Конфигурация и ID устройства не передаются.</string>
 </resources>

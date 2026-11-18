@@ -14,22 +14,26 @@ import java.security.SecureRandom
 object FreeNodeManager {
     fun isEnabled(): Boolean = MmkvManager.decodeSettingsBool(AppConfig.PREF_FREE_NODE_ENABLED, false)
 
+    fun isFeedbackEnabled(): Boolean = MmkvManager.decodeSettingsBool(AppConfig.PREF_FREE_NODE_FEEDBACK_ENABLED, true)
+
+    fun setFeedbackEnabled(enabled: Boolean) {
+        MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_FEEDBACK_ENABLED, enabled)
+    }
+
     fun isDedicatedSubscription(subscriptionId: String): Boolean =
         subscriptionId == AppConfig.FREE_NODE_SUBSCRIPTION_ID
 
     fun enable(context: Context) {
         val selectedBefore = MmkvManager.getSelectServer()
         val existingSubscription = MmkvManager.decodeSubscription(AppConfig.FREE_NODE_SUBSCRIPTION_ID)
-        if (existingSubscription == null) {
-            MmkvManager.encodeSubscription(
-                AppConfig.FREE_NODE_SUBSCRIPTION_ID,
-                SubscriptionItem(
-                    remarks = context.getString(R.string.free_node_subscription_name),
-                    url = AppConfig.FREE_NODE_SUBSCRIPTION_URL,
-                    autoUpdate = true,
-                ),
-            )
-        }
+        val subscription = existingSubscription ?: SubscriptionItem(
+            remarks = context.getString(R.string.free_node_subscription_name),
+            url = AppConfig.FREE_NODE_SUBSCRIPTION_URL,
+            autoUpdate = true,
+        )
+        subscription.url = AppConfig.FREE_NODE_SUBSCRIPTION_URL
+        subscription.autoUpdate = true
+        MmkvManager.encodeSubscription(AppConfig.FREE_NODE_SUBSCRIPTION_ID, subscription)
         try {
             ensurePolicyGroup(context)
             restoreSelection(selectedBefore)
@@ -61,11 +65,11 @@ object FreeNodeManager {
         return FreeNodeFingerprint.create(profile, fingerprintKey())
     }
 
-    fun migrateHistory(profiles: Collection<ProfileItem>) {
+    fun migrateHistory(profiles: Collection<ProfileItem>, candidateIds: Map<String, String> = emptyMap()) {
         val previous = MmkvManager.decodeSettingsString(AppConfig.PREF_FREE_NODE_HISTORY)
             ?.let { JsonUtil.fromJsonSafe(it, FreeNodeHistoryState::class.java) }
             ?: FreeNodeHistoryState()
-        val migrated = FreeNodeHistoryMigrator.migrate(previous, profiles, ::fingerprint)
+        val migrated = FreeNodeHistoryMigrator.migrate(previous, profiles, candidateIds, ::fingerprint)
         MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_HISTORY, JsonUtil.toJson(migrated))
         if (isEnabled()) FreeNodeProbeScheduler.schedule()
     }
@@ -77,9 +81,29 @@ object FreeNodeManager {
         return FreeNodeHistoryMigrator.recentlyValidatedProfiles(state, existing, incoming, ::fingerprint, System.currentTimeMillis())
     }
 
-    fun selectableFingerprints(now: Long = System.currentTimeMillis()): Set<String> = loadHistory().entries
-        .filterValues { FreeNodeHistoryMigrator.isSelectable(it, now) }
-        .keys
+    fun selectableFingerprints(now: Long = System.currentTimeMillis()): Set<String> {
+        val state = loadHistory()
+        return state.entries.filterValues {
+            it.remoteCandidateId !in state.revokedCandidateIds && FreeNodeHistoryMigrator.isSelectable(it, now)
+        }.keys
+    }
+
+    fun applyFeedRevocations(candidateIds: Set<String>) {
+        val state = loadHistory()
+        val revokedFingerprints = FreeNodeHistoryMigrator.revokedFingerprints(state, candidateIds)
+        val revokedProfiles = MmkvManager.decodeServerList(AppConfig.FREE_NODE_SUBSCRIPTION_ID)
+            .filter { guid ->
+                MmkvManager.decodeServerConfig(guid)?.let { fingerprint(it) in revokedFingerprints } == true
+            }
+        MmkvManager.removeServers(revokedProfiles, AppConfig.FREE_NODE_SUBSCRIPTION_ID)
+        if (state.revokedCandidateIds != candidateIds || revokedFingerprints.isNotEmpty()) {
+            saveHistory(state.copy(
+                revokedCandidateIds = candidateIds,
+                entries = state.entries - revokedFingerprints,
+                selectedFingerprint = state.selectedFingerprint?.takeUnless(revokedFingerprints::contains),
+            ))
+        }
+    }
 
     fun probePlan(now: Long = System.currentTimeMillis()): Map<String, String> {
         val profiles = MmkvManager.decodeServerList(AppConfig.FREE_NODE_SUBSCRIPTION_ID)
@@ -91,14 +115,16 @@ object FreeNodeManager {
         }.toMap()
     }
 
-    fun recordProbe(fingerprint: String, delayMillis: Long, now: Long = System.currentTimeMillis()) {
+    fun recordProbe(fingerprint: String, delayMillis: Long, now: Long = System.currentTimeMillis()): FreeNodeFeedbackReport? {
         val previous = loadHistory()
-        val history = previous.entries[fingerprint] ?: return
+        val history = previous.entries[fingerprint] ?: return null
+        val report = if (isFeedbackEnabled()) FreeNodeFeedbackReport.from(history.remoteCandidateId, delayMillis) else null
         val updated = previous.copy(
             version = AppConfig.FREE_NODE_STATE_VERSION,
             entries = previous.entries + (fingerprint to FreeNodeScoring.recordProbe(history, delayMillis, now)),
         )
         saveHistory(FreeNodeScoring.select(updated, now))
+        return report
     }
 
     private fun ensurePolicyGroup(context: Context) {

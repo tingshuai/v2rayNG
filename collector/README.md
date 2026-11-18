@@ -2,6 +2,8 @@
 
 `collector/` is the independently built and deployed service that turns explicitly registered public sources into a standard V2Ray-compatible candidate subscription. It has no runtime dependency on `V2rayNG/`; the only shared boundary is the versioned contract in [`../docs/free-node/feed-schema.md`](../docs/free-node/feed-schema.md).
 
+`/manifest` returns the versioned client feed with opaque HMAC candidate IDs, bounded weighted selection, expiry, digest, and explicit revocations. `/subscription` remains the standard Base64 subscription export for generic clients. Revoke a candidate with its opaque manifest ID; the reason must be non-secret.
+
 The service is intentionally conservative: it rejects authenticated sources and non-public resolved addresses, never scans ports, and retains only secret-safe fingerprints in SQLite. Full candidate configurations exist only in the encrypted runtime work directory while publishing a batch, never in the database or logs.
 
 ## Local commands
@@ -13,6 +15,8 @@ go run ./cmd/collector source add -database ./data/collector.sqlite -id example 
 go run ./cmd/collector source update -database ./data/collector.sqlite -id example -url https://source.example/subscription-v2 -min-fetch-interval 30m -reason operator_request
 go run ./cmd/collector source pause -database ./data/collector.sqlite -id example -reason operator_request
 go run ./cmd/collector source delete -database ./data/collector.sqlite -id example -reason operator_request
+go run ./cmd/collector candidate revoke -database ./data/collector.sqlite -id <manifest-candidate-id> -reason unsafe_address
+go run ./cmd/collector candidate restore -database ./data/collector.sqlite -id <manifest-candidate-id> -reason false_positive_review
 go run ./cmd/collector run -database ./data/collector.sqlite -work-dir ./data -fingerprint-key-file /run/secrets/collector_fingerprint_key -sing-box-path /usr/local/bin/sing-box
 go run ./cmd/collector serve -database ./data/collector.sqlite -work-dir ./data -listen 127.0.0.1:8080 -fingerprint-key-file /run/secrets/collector_fingerprint_key
 ```

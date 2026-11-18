@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -204,7 +205,7 @@ func TestCandidateQualityAndAssignmentPressureAreAggregated(t *testing.T) {
 		t.Fatal(err)
 	}
 	quality := qualities["candidate-good"]
-	if quality.SuccessCount != 2 || quality.FailureCount != 1 || quality.ConsecutiveFails != 1 || quality.AssignmentCount != 2 || quality.LastSuccessAt == nil {
+	if quality.SuccessCount != 2 || quality.FailureCount != 1 || quality.ConsecutiveFails != 1 || quality.AssignmentCount != 2 || quality.DailyAssignmentCount != 2 || quality.LastSuccessAt == nil {
 		t.Fatalf("candidate quality = %#v", quality)
 	}
 	if _, exists := qualities["candidate-missing"]; exists {
@@ -252,6 +253,86 @@ func TestCandidateRetentionRequiresSuccessfulSourceInventoryAbsence(t *testing.T
 	}
 	if err := store.db.QueryRow("SELECT COUNT(*) FROM candidate_fingerprints WHERE fingerprint='candidate-old'").Scan(&count); err != nil || count != 0 {
 		t.Fatalf("candidate after every source confirms absence = %d, err=%v; want deleted", count, err)
+	}
+}
+
+func TestFeedbackIsStoredAsBoundedDailyAggregateAndExpires(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
+	candidateID := strings.Repeat("a", 64)
+	if err := store.RecordCandidateProbe(context.Background(), candidateID, true, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordFeedback(context.Background(), candidateID, "failure", "none", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordFeedback(context.Background(), candidateID, "success", "100_300", now); err != nil {
+		t.Fatal(err)
+	}
+	quality, err := store.CandidateQuality(context.Background(), []string{candidateID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if quality[candidateID].FeedbackFailure != 1 || quality[candidateID].FeedbackSuccess != 1 {
+		t.Fatalf("feedback quality counts = %+v", quality[candidateID])
+	}
+	if err := store.RecordFeedback(context.Background(), candidateID, "failure", "lt_100", now); err == nil {
+		t.Fatal("failed probe feedback accepted a latency bucket")
+	}
+	unknownID := strings.Repeat("f", 64)
+	if err := store.RecordFeedback(context.Background(), unknownID, "failure", "none", now); err != nil {
+		t.Fatal(err)
+	}
+	var unknownCount int
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM feedback_aggregates WHERE fingerprint=?", unknownID).Scan(&unknownCount); err != nil || unknownCount != 0 {
+		t.Fatalf("unknown candidate aggregate count=%d err=%v", unknownCount, err)
+	}
+	if err := store.PruneExpired(context.Background(), now.Add(8*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM feedback_aggregates").Scan(&count); err != nil || count != 0 {
+		t.Fatalf("expired feedback rows=%d err=%v", count, err)
+	}
+}
+
+func TestSecurityRevocationPersistsUntilExplicitRestore(t *testing.T) {
+	store, err := OpenSQLite(filepath.Join(t.TempDir(), "collector.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), filepath.Join("..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	id := strings.Repeat("d", 64)
+	if err := store.RevokeCandidate(context.Background(), id, "unsafe_address"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PruneExpired(context.Background(), time.Now().UTC().Add(31*24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	revoked, err := store.CandidateRevocations(context.Background())
+	if err != nil || revoked[id] != "unsafe_address" {
+		t.Fatalf("revocation after retention prune = %v, err=%v", revoked, err)
+	}
+	if err := store.RestoreCandidate(context.Background(), id, "false_positive_review"); err != nil {
+		t.Fatal(err)
+	}
+	revoked, err = store.CandidateRevocations(context.Background())
+	if err != nil || len(revoked) != 0 {
+		t.Fatalf("revocation after explicit restore = %v, err=%v", revoked, err)
+	}
+	var auditCount int
+	if err := store.db.QueryRow("SELECT COUNT(*) FROM candidate_revocation_audit").Scan(&auditCount); err != nil || auditCount != 1 {
+		t.Fatalf("revocation audit entries=%d err=%v; want old audit pruned and restore event retained", auditCount, err)
 	}
 }
 

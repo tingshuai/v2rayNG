@@ -572,6 +572,9 @@
     <string name="free_node_risk_message">گره‌های رایگان قابل اعتماد نیستند. گذرواژه، پرداخت یا ترافیک حساس دیگر را از آن‌ها عبور ندهید.</string>
     <string name="free_node_enable_confirm">می‌دانم و فعال می‌کنم</string>
     <string name="free_node_enable_failed">فعال‌سازی گره‌های رایگان انجام نشد.</string>
+    <string name="free_node_no_healthy_candidates">هیچ گره رایگان تأییدشده‌ای در دستگاه نیست. آزمون سرعت را اجرا کنید یا بعداً دوباره تلاش کنید.</string>
     <string name="free_node_subscription_name">نامزدهای گرهٔ رایگان</string>
     <string name="free_node_policy_group_name">انتخاب خودکار گرهٔ رایگان</string>
+    <string name="free_node_feedback_title">Anonymous probe feedback</string>
+    <string name="free_node_feedback_summary">Only coarse results and latency ranges are sent after network validation. No configuration or device ID is sent.</string>
 </resources>

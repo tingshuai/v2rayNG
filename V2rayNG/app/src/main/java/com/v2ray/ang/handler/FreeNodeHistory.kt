@@ -12,12 +12,14 @@ data class FreeNodeHistory(
     val jitterEwmaMillis: Double? = null,
     val isolatedUntil: Long? = null,
     val challengerWins: Int = 0,
+    val remoteCandidateId: String? = null,
 )
 
 data class FreeNodeHistoryState(
     val version: Int = 2,
     val entries: Map<String, FreeNodeHistory> = emptyMap(),
     val selectedFingerprint: String? = null,
+    val revokedCandidateIds: Set<String> = emptySet(),
 )
 
 /** Keeps only history for the current subscription replacement, keyed by a secret-safe fingerprint. */
@@ -28,11 +30,14 @@ object FreeNodeHistoryMigrator {
     fun migrate(
         state: FreeNodeHistoryState,
         profiles: Collection<ProfileItem>,
+        candidateIds: Map<String, String> = emptyMap(),
         fingerprint: (ProfileItem) -> String,
     ): FreeNodeHistoryState {
         val entries = profiles.associate { profile ->
             val key = fingerprint(profile)
-            key to (state.entries[key] ?: FreeNodeHistory())
+            key to (state.entries[key] ?: FreeNodeHistory()).let { history ->
+                candidateIds[key]?.let { history.copy(remoteCandidateId = it) } ?: history
+            }
         }
         return state.copy(
             version = 2,
@@ -55,7 +60,7 @@ object FreeNodeHistoryMigrator {
                 val history = state.entries[key] ?: return@mapNotNull null
                 val recent = history.lastSuccessAt?.let { now - it in 0..RETAINED_SUCCESS_MILLIS } == true
                 val isolated = history.isolatedUntil?.let { it > now } == true
-                if (key !in incoming && recent && !isolated) profile else null
+                if (key !in incoming && recent && !isolated && history.remoteCandidateId !in state.revokedCandidateIds) profile else null
             }
             .sortedByDescending { state.entries[fingerprint(it)]?.lastSuccessAt ?: 0L }
             .take(MAX_RETAINED_PROFILES)
@@ -67,4 +72,7 @@ object FreeNodeHistoryMigrator {
             history.successCount > 0 &&
             history.lastSuccessAt?.let { now >= it && now - it <= RETAINED_SUCCESS_MILLIS } == true &&
             history.isolatedUntil == null
+
+    fun revokedFingerprints(state: FreeNodeHistoryState, revokedCandidateIds: Set<String>): Set<String> =
+        state.entries.filterValues { it.remoteCandidateId in revokedCandidateIds }.keys
 }

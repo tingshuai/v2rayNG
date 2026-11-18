@@ -109,6 +109,7 @@ fun SettingsScreen(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val systemVpnSettingsAvailable by viewModel.systemVpnSettingsAvailable.collectAsStateWithLifecycle()
     val freeNodesEnabled by viewModel.freeNodesEnabled.collectAsStateWithLifecycle()
+    val freeNodeFeedbackEnabled by viewModel.freeNodeFeedbackEnabled.collectAsStateWithLifecycle()
     var showFreeNodeRiskDialog by rememberSaveable { mutableStateOf(false) }
     var uiSettingsExpanded by rememberSaveable { mutableStateOf(true) }
     var freeNodeSettingsExpanded by rememberSaveable { mutableStateOf(true) }
@@ -274,6 +275,14 @@ fun SettingsScreen(
                         if (enabled) showFreeNodeRiskDialog = true else viewModel.disableFreeNodes()
                     },
                 )
+                if (freeNodesEnabled) {
+                    SettingsSwitchItem(
+                        title = stringResource(R.string.free_node_feedback_title),
+                        summary = stringResource(R.string.free_node_feedback_summary),
+                        checked = freeNodeFeedbackEnabled,
+                        onCheckedChange = viewModel::setFreeNodeFeedbackEnabled,
+                    )
+                }
             }
             CollapsiblePreferenceGroupHeader(
                 title = stringResource(R.string.title_ui_settings),

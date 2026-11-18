@@ -15,10 +15,11 @@ import (
 )
 
 type recordingStore struct {
-	pruned   bool
-	pruneErr error
-	sources  []Source
-	outcomes []RunOutcome
+	pruned           bool
+	pruneErr         error
+	sources          []Source
+	outcomes         []RunOutcome
+	candidateSources map[string][]string
 }
 
 func (store *recordingStore) RegisterSource(context.Context, SourceRegistration) error { return nil }
@@ -53,7 +54,18 @@ func (store *recordingStore) CandidateQuality(context.Context, []string) (map[st
 	return map[string]CandidateQuality{}, nil
 }
 func (store *recordingStore) CandidateSources(context.Context, []string) (map[string][]string, error) {
-	return map[string][]string{}, nil
+	return store.candidateSources, nil
+}
+func (store *recordingStore) CandidateRevocations(context.Context) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+func (store *recordingStore) RevokeCandidate(context.Context, string, string) error  { return nil }
+func (store *recordingStore) RestoreCandidate(context.Context, string, string) error { return nil }
+func (store *recordingStore) RecordFeedback(context.Context, string, string, string, time.Time) error {
+	return nil
+}
+func (store *recordingStore) RecordFeedbackBatch(context.Context, []FeedbackReport, time.Time) error {
+	return nil
 }
 func (store *recordingStore) RecordCandidateAssignments(context.Context, []string) error { return nil }
 func (store *recordingStore) PruneExpired(context.Context, time.Time) error {
@@ -75,6 +87,26 @@ func TestPublishAtomicallyKeepsPreviousOutputAsRollback(t *testing.T) {
 	}
 	if string(previous) != "b25l" {
 		t.Fatalf("previous output = %q, want base64(one)", previous)
+	}
+}
+
+func TestMergeCandidatePoolKeepsRecentSourceCandidatesAndAddsNewOnes(t *testing.T) {
+	workDir := t.TempDir()
+	key := make([]byte, 32)
+	previous := []string{"ss://old@example.com:443", "trojan://orphan@example.net:443"}
+	if _, err := publishAtomically(workDir, previous); err != nil {
+		t.Fatal(err)
+	}
+	oldID := fingerprint(key, previous[0])
+	store := &recordingStore{candidateSources: map[string][]string{oldID: {"source-one"}}}
+	accepted := []string{"ss://new@example.org:443", previous[0]}
+	pool, err := mergeCandidatePool(context.Background(), workDir, store, key, accepted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{previous[0], accepted[0]}
+	if strings.Join(pool, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("candidate pool = %q, want %q", pool, want)
 	}
 }
 

@@ -570,6 +570,9 @@
     <string name="free_node_risk_message">免費節點不可信。請勿透過它們傳送密碼、付款資訊或其他敏感流量。</string>
     <string name="free_node_enable_confirm">我已了解並啟用</string>
     <string name="free_node_enable_failed">無法啟用免費節點。</string>
+    <string name="free_node_no_healthy_candidates">沒有通過本機驗證的免費節點。請先執行測速或稍後再試。</string>
     <string name="free_node_subscription_name">免費節點候選</string>
     <string name="free_node_policy_group_name">免費節點自動選擇</string>
+    <string name="free_node_feedback_title">傳送匿名探測回饋</string>
+    <string name="free_node_feedback_summary">網路確認可用後，只傳送概略結果和延遲範圍，不傳送節點設定或裝置識別碼。</string>
 </resources>

@@ -418,8 +418,15 @@ func (store *SQLiteStore) CandidateQuality(ctx context.Context, fingerprints []s
 	for _, value := range fingerprints {
 		args = append(args, value)
 	}
-	rows, err := store.db.QueryContext(ctx, `SELECT fingerprint, success_count, failure_count, consecutive_failures, assignment_count, last_success_at
-		FROM candidate_fingerprints WHERE fingerprint IN (`+placeholders+")", args...)
+	qualityNow := time.Now().UTC()
+	feedbackSince := qualityNow.Add(-7 * 24 * time.Hour).Format("2006-01-02")
+	today := qualityNow.Format("2006-01-02")
+	queryArgs := append([]any{feedbackSince, feedbackSince, today}, args...)
+	rows, err := store.db.QueryContext(ctx, `SELECT fingerprint, success_count, failure_count, consecutive_failures, assignment_count, last_success_at,
+		COALESCE((SELECT SUM(report_count) FROM feedback_aggregates f WHERE f.fingerprint=candidate_fingerprints.fingerprint AND f.outcome='success' AND f.day_utc >= ?), 0),
+		COALESCE((SELECT SUM(report_count) FROM feedback_aggregates f WHERE f.fingerprint=candidate_fingerprints.fingerprint AND f.outcome='failure' AND f.day_utc >= ?), 0),
+		COALESCE((SELECT assignment_count FROM candidate_daily_assignments a WHERE a.fingerprint=candidate_fingerprints.fingerprint AND a.day_utc=?), 0)
+		FROM candidate_fingerprints WHERE fingerprint IN (`+placeholders+")", queryArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +435,7 @@ func (store *SQLiteStore) CandidateQuality(ctx context.Context, fingerprints []s
 		var fingerprint string
 		var quality CandidateQuality
 		var lastSuccess sql.NullString
-		if err := rows.Scan(&fingerprint, &quality.SuccessCount, &quality.FailureCount, &quality.ConsecutiveFails, &quality.AssignmentCount, &lastSuccess); err != nil {
+		if err := rows.Scan(&fingerprint, &quality.SuccessCount, &quality.FailureCount, &quality.ConsecutiveFails, &quality.AssignmentCount, &lastSuccess, &quality.FeedbackSuccess, &quality.FeedbackFailure, &quality.DailyAssignmentCount); err != nil {
 			return nil, err
 		}
 		if lastSuccess.Valid {
@@ -441,6 +448,41 @@ func (store *SQLiteStore) CandidateQuality(ctx context.Context, fingerprints []s
 		qualities[fingerprint] = quality
 	}
 	return qualities, rows.Err()
+}
+
+func (store *SQLiteStore) RecordFeedback(ctx context.Context, candidateFingerprint, outcome, latencyBucket string, reportedAt time.Time) error {
+	return store.RecordFeedbackBatch(ctx, []FeedbackReport{{CandidateID: candidateFingerprint, Outcome: outcome, LatencyBucket: latencyBucket}}, reportedAt)
+}
+
+func (store *SQLiteStore) RecordFeedbackBatch(ctx context.Context, reports []FeedbackReport, reportedAt time.Time) error {
+	if len(reports) > 8 {
+		return errors.New("feedback batch exceeds report limit")
+	}
+	for _, report := range reports {
+		if err := report.Validate(); err != nil {
+			return err
+		}
+	}
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	day := reportedAt.UTC().Format("2006-01-02")
+	for _, report := range reports {
+		var known bool
+		if err := tx.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM candidate_fingerprints WHERE fingerprint=?)", report.CandidateID).Scan(&known); err != nil {
+			return err
+		}
+		if !known {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO feedback_aggregates(fingerprint, day_utc, outcome, latency_bucket, report_count) VALUES(?, ?, ?, ?, 1)
+			ON CONFLICT(fingerprint, day_utc, outcome, latency_bucket) DO UPDATE SET report_count=MIN(report_count+1, 10000)`, report.CandidateID, day, report.Outcome, report.LatencyBucket); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (store *SQLiteStore) CandidateSources(ctx context.Context, fingerprints []string) (map[string][]string, error) {
@@ -468,6 +510,85 @@ func (store *SQLiteStore) CandidateSources(ctx context.Context, fingerprints []s
 	return sources, rows.Err()
 }
 
+func (store *SQLiteStore) CandidateRevocations(ctx context.Context) (map[string]string, error) {
+	rows, err := store.db.QueryContext(ctx, "SELECT fingerprint, reason FROM candidate_revocations")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	revoked := make(map[string]string)
+	for rows.Next() {
+		var fingerprint, reason string
+		if err := rows.Scan(&fingerprint, &reason); err != nil {
+			return nil, err
+		}
+		revoked[fingerprint] = reason
+	}
+	return revoked, rows.Err()
+}
+
+func (store *SQLiteStore) RevokeCandidate(ctx context.Context, candidateFingerprint, reason string) error {
+	if !validCandidateID(candidateFingerprint) {
+		return errors.New("candidate fingerprint is invalid")
+	}
+	if reason != "unsafe_address" && reason != "unsafe_configuration" && reason != "operator_security_review" {
+		return errors.New("revocation reason is not an allowed non-secret code")
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_revocations(fingerprint, reason, revoked_at) VALUES(?, ?, ?)
+		ON CONFLICT(fingerprint) DO UPDATE SET reason=excluded.reason, revoked_at=excluded.revoked_at`, candidateFingerprint, reason, now); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO candidate_revocation_audit(fingerprint, action, reason, occurred_at) VALUES(?, 'revoked', ?, ?)", candidateFingerprint, reason, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (store *SQLiteStore) RestoreCandidate(ctx context.Context, candidateFingerprint, reason string) error {
+	if !validCandidateID(candidateFingerprint) || reason != "false_positive_review" && reason != "operator_release" {
+		return errors.New("candidate ID or restore reason is invalid")
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(ctx, "DELETE FROM candidate_revocations WHERE fingerprint=?", candidateFingerprint)
+	if err != nil {
+		return err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if changed == 0 {
+		return ErrCandidateNotRevoked
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO candidate_revocation_audit(fingerprint, action, reason, occurred_at) VALUES(?, 'restored', ?, ?)", candidateFingerprint, reason, now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func validCandidateID(candidateID string) bool {
+	if len(candidateID) != 64 {
+		return false
+	}
+	for _, char := range candidateID {
+		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
 func (store *SQLiteStore) RecordCandidateAssignments(ctx context.Context, fingerprints []string) error {
 	if len(fingerprints) == 0 {
 		return nil
@@ -478,10 +599,15 @@ func (store *SQLiteStore) RecordCandidateAssignments(ctx context.Context, finger
 	}
 	defer tx.Rollback()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
+	day := time.Now().UTC().Format("2006-01-02")
 	for _, candidateFingerprint := range fingerprints {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_fingerprints(fingerprint, first_seen_at, last_seen_at, success_count, failure_count, assignment_count)
 			VALUES(?, ?, ?, 0, 0, 1)
 			ON CONFLICT(fingerprint) DO UPDATE SET assignment_count=candidate_fingerprints.assignment_count + 1`, candidateFingerprint, now, now); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO candidate_daily_assignments(fingerprint, day_utc, assignment_count) VALUES(?, ?, 1)
+			ON CONFLICT(fingerprint, day_utc) DO UPDATE SET assignment_count=assignment_count+1`, candidateFingerprint, day); err != nil {
 			return err
 		}
 	}
@@ -557,6 +683,15 @@ func (store *SQLiteStore) PruneExpired(ctx context.Context, now time.Time) error
 	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM candidate_fingerprints WHERE last_seen_at < ? AND NOT EXISTS (
 		SELECT 1 FROM source_candidate_presence p WHERE p.fingerprint=candidate_fingerprints.fingerprint)`, cutoff); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM candidate_revocation_audit WHERE occurred_at < ?", cutoff); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM feedback_aggregates WHERE day_utc < ?", now.Add(-7*24*time.Hour).UTC().Format("2006-01-02")); err != nil {
+		return err
+	}
+	if _, err = tx.ExecContext(ctx, "DELETE FROM candidate_daily_assignments WHERE day_utc < ?", now.Add(-runRetention).UTC().Format("2006-01-02")); err != nil {
 		return err
 	}
 	return tx.Commit()

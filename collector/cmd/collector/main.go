@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/tingshuai/FreeV2ray/collector/internal/collector"
@@ -16,13 +20,15 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fail(errors.New("usage: collector <migrate|source|run|serve>"))
+		fail(errors.New("usage: collector <migrate|source|candidate|run|serve>"))
 	}
 	switch os.Args[1] {
 	case "migrate":
 		migrate(os.Args[2:])
 	case "source":
 		source(os.Args[2:])
+	case "candidate":
+		candidate(os.Args[2:])
 	case "run":
 		run(os.Args[2:])
 	case "serve":
@@ -30,6 +36,29 @@ func main() {
 	default:
 		fail(fmt.Errorf("unknown command %q", os.Args[1]))
 	}
+}
+
+func candidate(arguments []string) {
+	if len(arguments) == 0 || (arguments[0] != "revoke" && arguments[0] != "restore") {
+		fail(errors.New("usage: collector candidate <revoke|restore> -id <manifest-id> -reason <allowed-code>"))
+	}
+	action := arguments[0]
+	flags := flag.NewFlagSet("collector candidate "+action, flag.ExitOnError)
+	database := flags.String("database", "./data/collector.sqlite", "SQLite database path")
+	migrations := flags.String("migrations", "./migrations", "migration directory")
+	id := flags.String("id", "", "opaque candidate ID from manifest")
+	reason := flags.String("reason", "", "allowed non-secret reason code")
+	flags.Parse(arguments[1:])
+	store := openAndMigrate(*database, *migrations)
+	defer store.Close()
+	if action == "revoke" {
+		if err := store.RevokeCandidate(context.Background(), *id, *reason); err != nil {
+			fail(err)
+		}
+	} else if err := store.RestoreCandidate(context.Background(), *id, *reason); err != nil {
+		fail(err)
+	}
+	slog.Info("candidate revocation state changed", "candidate_id", *id, "action", action, "reason", *reason)
 }
 
 func run(arguments []string) {
@@ -142,15 +171,32 @@ func serve(arguments []string) {
 	selector := func(ctx context.Context, published []byte) ([]byte, error) {
 		return collector.DistributeSubscription(ctx, store, key, published, collector.DefaultDistributionLimit)
 	}
-	server := &http.Server{Addr: *listen, Handler: newServeMux(*workDir, *maxPublishAge, selector), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	manifestSelector := func(ctx context.Context, published []byte) ([]byte, error) {
+		info, err := os.Stat(filepath.Join(*workDir, "published", "subscription.txt"))
+		if err != nil {
+			return nil, err
+		}
+		return collector.BuildCandidateManifest(ctx, store, key, published, collector.DefaultDistributionLimit, info.ModTime(), time.Now().UTC())
+	}
+	server := &http.Server{Addr: *listen, Handler: newServeMuxWithManifest(*workDir, *maxPublishAge, selector, manifestSelector, store), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
 	slog.Info("collector listening", "address", *listen)
 	fail(server.ListenAndServe())
 }
 
 type subscriptionSelector func(context.Context, []byte) ([]byte, error)
+type manifestSelector func(context.Context, []byte) ([]byte, error)
 
 func newServeMux(workDir string, maxPublishAge time.Duration, selectors ...subscriptionSelector) *http.ServeMux {
+	return newServeMuxInternal(workDir, maxPublishAge, selectors, nil, nil)
+}
+
+func newServeMuxWithManifest(workDir string, maxPublishAge time.Duration, selector subscriptionSelector, manifest manifestSelector, feedback feedbackRecorder) *http.ServeMux {
+	return newServeMuxInternal(workDir, maxPublishAge, []subscriptionSelector{selector}, &manifest, feedback)
+}
+
+func newServeMuxInternal(workDir string, maxPublishAge time.Duration, selectors []subscriptionSelector, manifest *manifestSelector, feedback feedbackRecorder) *http.ServeMux {
 	mux := http.NewServeMux()
+	feedbackLimiter := &windowRateLimiter{limit: 120, window: time.Minute}
 	mux.HandleFunc("GET /healthz", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Cache-Control", "no-store")
 		info, err := os.Stat(filepath.Join(workDir, "published", "subscription.txt"))
@@ -161,14 +207,8 @@ func newServeMux(workDir string, maxPublishAge time.Duration, selectors ...subsc
 		writer.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /subscription", func(writer http.ResponseWriter, request *http.Request) {
-		output, err := os.ReadFile(filepath.Join(workDir, "published", "subscription.txt"))
-		if errors.Is(err, os.ErrNotExist) {
-			http.Error(writer, "subscription unavailable", http.StatusServiceUnavailable)
-			return
-		}
-		if err != nil {
-			slog.Error("read published subscription", "component", "http", "error", err)
-			http.Error(writer, "subscription unavailable", http.StatusInternalServerError)
+		output, status := readPublished(writer, workDir)
+		if status != 0 {
 			return
 		}
 		response := output
@@ -184,7 +224,99 @@ func newServeMux(workDir string, maxPublishAge time.Duration, selectors ...subsc
 		writer.Header().Set("Cache-Control", "no-store")
 		_, _ = writer.Write(response)
 	})
+	if manifest != nil {
+		mux.HandleFunc("GET /manifest", func(writer http.ResponseWriter, request *http.Request) {
+			output, status := readPublished(writer, workDir)
+			if status != 0 {
+				return
+			}
+			response, err := (*manifest)(request.Context(), output)
+			if err != nil {
+				slog.Error("build candidate manifest", "component", "http", "error", err)
+				http.Error(writer, "manifest unavailable", http.StatusInternalServerError)
+				return
+			}
+			writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+			writer.Header().Set("Cache-Control", "no-store")
+			_, _ = writer.Write(response)
+		})
+	}
+	mux.HandleFunc("POST /feedback", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Cache-Control", "no-store")
+		if !feedbackLimiter.allow(time.Now()) {
+			http.Error(writer, "feedback rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+		request.Body = http.MaxBytesReader(writer, request.Body, 2048)
+		decoder := json.NewDecoder(request.Body)
+		decoder.DisallowUnknownFields()
+		var reports []collector.FeedbackReport
+		if err := decoder.Decode(&reports); err != nil || len(reports) == 0 || len(reports) > 8 {
+			http.Error(writer, "invalid feedback", http.StatusBadRequest)
+			return
+		}
+		if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+			http.Error(writer, "invalid feedback", http.StatusBadRequest)
+			return
+		}
+		for _, report := range reports {
+			if report.CandidateID != strings.ToLower(report.CandidateID) || report.Validate() != nil {
+				http.Error(writer, "invalid feedback", http.StatusBadRequest)
+				return
+			}
+		}
+		if feedback == nil {
+			http.Error(writer, "feedback unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		if err := feedback.RecordFeedbackBatch(request.Context(), reports, time.Now().UTC()); err != nil {
+			slog.Error("aggregate candidate feedback", "component", "http", "error", err)
+			http.Error(writer, "feedback unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		writer.WriteHeader(http.StatusNoContent)
+	})
 	return mux
+}
+
+type feedbackRecorder interface {
+	RecordFeedbackBatch(context.Context, []collector.FeedbackReport, time.Time) error
+}
+
+type windowRateLimiter struct {
+	mutex   sync.Mutex
+	limit   int
+	window  time.Duration
+	started time.Time
+	count   int
+}
+
+func (limiter *windowRateLimiter) allow(now time.Time) bool {
+	limiter.mutex.Lock()
+	defer limiter.mutex.Unlock()
+	if limiter.started.IsZero() || now.Sub(limiter.started) >= limiter.window {
+		limiter.started = now
+		limiter.count = 0
+	}
+	if limiter.count >= limiter.limit {
+		return false
+	}
+	limiter.count++
+	return true
+}
+
+func readPublished(writer http.ResponseWriter, workDir string) ([]byte, int) {
+	output, err := os.ReadFile(filepath.Join(workDir, "published", "subscription.txt"))
+	if errors.Is(err, os.ErrNotExist) {
+		http.Error(writer, "subscription unavailable", http.StatusServiceUnavailable)
+		return nil, http.StatusServiceUnavailable
+	}
+	if err != nil {
+		slog.Error("read published subscription", "component", "http", "error", err)
+		http.Error(writer, "subscription unavailable", http.StatusInternalServerError)
+		return nil, http.StatusInternalServerError
+	}
+	return output, 0
 }
 
 func openAndMigrate(database, migrations string) *collector.SQLiteStore {

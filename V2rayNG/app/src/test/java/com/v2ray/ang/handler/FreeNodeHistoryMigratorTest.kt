@@ -59,4 +59,36 @@ class FreeNodeHistoryMigratorTest {
         assertEquals(true, FreeNodeHistoryMigrator.isSelectable(FreeNodeHistory(successCount = 1, lastSuccessAt = now), now))
         assertEquals(false, FreeNodeHistoryMigrator.isSelectable(FreeNodeHistory(successCount = 1, lastSuccessAt = now - 8 * 24 * 60 * 60 * 1000L), now))
     }
+
+    @Test
+    fun `server-revoked candidate is not retained from previous feed`() {
+        val now = 10_000L
+        val candidateId = "a".repeat(64)
+        val profile = ProfileItem.create(EConfigType.VLESS)
+        val state = FreeNodeHistoryState(
+            entries = mapOf("local-fingerprint" to FreeNodeHistory(lastSuccessAt = now, successCount = 1, remoteCandidateId = candidateId)),
+            revokedCandidateIds = setOf(candidateId),
+        )
+        assertEquals(
+            emptyList<ProfileItem>(),
+            FreeNodeHistoryMigrator.recentlyValidatedProfiles(state, listOf(profile), emptyList(), { "local-fingerprint" }, now),
+        )
+    }
+
+    @Test
+    fun `revocation identifies local profiles for physical removal`() {
+        val revokedId = "a".repeat(64)
+        val retainedId = "b".repeat(64)
+        val state = FreeNodeHistoryState(
+            entries = mapOf(
+                "revoked-fingerprint" to FreeNodeHistory(remoteCandidateId = revokedId),
+                "retained-fingerprint" to FreeNodeHistory(remoteCandidateId = retainedId),
+            ),
+        )
+
+        assertEquals(
+            setOf("revoked-fingerprint"),
+            FreeNodeHistoryMigrator.revokedFingerprints(state, setOf(revokedId)),
+        )
+    }
 }

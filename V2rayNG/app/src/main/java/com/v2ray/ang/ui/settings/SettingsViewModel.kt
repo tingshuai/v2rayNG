@@ -10,17 +10,35 @@ import com.v2ray.ang.handler.FreeNodeManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.root.RootManager
 import com.v2ray.ang.ui.base.BaseViewModel
+import com.v2ray.ang.util.LogUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
-class SettingsViewModel(application: Application) : BaseViewModel(application) {
+class SettingsViewModel(
+    application: Application,
+    private val feedbackEnabledProvider: () -> Boolean,
+    private val feedbackEnabledSetter: (Boolean) -> Unit,
+) : BaseViewModel(application) {
+
+    constructor(application: Application) : this(
+        application,
+        FreeNodeManager::isFeedbackEnabled,
+        FreeNodeManager::setFeedbackEnabled,
+    )
 
     private val _systemVpnSettingsAvailable = MutableStateFlow(false)
     val systemVpnSettingsAvailable = _systemVpnSettingsAvailable.asStateFlow()
     private val _freeNodesEnabled = MutableStateFlow(FreeNodeManager.isEnabled())
     val freeNodesEnabled = _freeNodesEnabled.asStateFlow()
+    private val _freeNodeFeedbackEnabled = MutableStateFlow(feedbackEnabledProvider())
+    val freeNodeFeedbackEnabled = _freeNodeFeedbackEnabled.asStateFlow()
+
+    fun setFreeNodeFeedbackEnabled(enabled: Boolean) {
+        feedbackEnabledSetter(enabled)
+        _freeNodeFeedbackEnabled.value = enabled
+    }
 
     fun enableFreeNodes() {
         launchLoading {
@@ -29,7 +47,9 @@ class SettingsViewModel(application: Application) : BaseViewModel(application) {
                     FreeNodeManager.enable(getApplication())
                     val subscription = MmkvManager.decodeSubscriptions()
                         .first { FreeNodeManager.isDedicatedSubscription(it.guid) }
-                    check(AngConfigManager.updateConfigViaSub(subscription).successCount == 1) {
+                      val result = AngConfigManager.updateConfigViaSub(subscription)
+                      check(result.successCount == 1) {
+                          LogUtil.e(AppConfig.TAG, "Free-node feed update failed (failures=${result.failureCount})")
                         "free-node subscription update failed"
                     }
                 }

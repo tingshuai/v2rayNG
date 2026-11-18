@@ -570,6 +570,9 @@
     <string name="free_node_risk_message">免费节点不可信。请勿通过它们发送密码、付款信息或其他敏感流量。</string>
     <string name="free_node_enable_confirm">我已了解并启用</string>
     <string name="free_node_enable_failed">无法启用免费节点。</string>
+    <string name="free_node_no_healthy_candidates">没有本地验证通过的免费节点。请先运行测速或稍后重试。</string>
     <string name="free_node_subscription_name">免费节点候选</string>
     <string name="free_node_policy_group_name">免费节点自动选择</string>
+    <string name="free_node_feedback_title">发送匿名探测反馈</string>
+    <string name="free_node_feedback_summary">网络确认可用后，仅发送粗略结果和延迟范围，不发送节点配置或设备标识。</string>
 </resources>

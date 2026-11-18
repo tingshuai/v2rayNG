@@ -26,6 +26,7 @@ const (
 	defaultTCPConcurrency   = 2
 	maxTCPConcurrency       = 2
 	maxScreenedCandidates   = 50
+	maxPublishedPool        = 512
 	backupRetention         = 7 * 24 * time.Hour
 )
 
@@ -115,7 +116,11 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 	if err := finalizationCtx.Err(); err != nil {
 		return fmt.Errorf("finalize batch: %w", err)
 	}
-	publication, err := publishAtomically(runner.WorkDir, accepted)
+	pool, err := mergeCandidatePool(finalizationCtx, runner.WorkDir, runner.Store, runner.FingerprintKey, accepted)
+	if err != nil {
+		return fmt.Errorf("merge screened candidate pool: %w", err)
+	}
+	publication, err := publishAtomically(runner.WorkDir, pool)
 	if err != nil {
 		return err
 	}
@@ -125,8 +130,58 @@ func (runner BatchRunner) Run(ctx context.Context) error {
 		}
 		return fmt.Errorf("record publication: %w", err)
 	}
-	slog.Info("collector batch published", "component", "batch", "enabled_source_count", len(sources), "due_source_count", len(due), "deferred_source_count", deferredSources, "published_candidate_count", len(accepted), "screening_deadline_exceeded", screeningCtx.Err() != nil)
+	slog.Info("collector batch published", "component", "batch", "enabled_source_count", len(sources), "due_source_count", len(due), "deferred_source_count", deferredSources, "new_candidate_count", len(accepted), "published_pool_count", len(pool), "screening_deadline_exceeded", screeningCtx.Err() != nil)
 	return nil
+}
+
+func mergeCandidatePool(ctx context.Context, workDir string, store Store, key []byte, accepted []string) ([]string, error) {
+	activePath := filepath.Join(workDir, "published", "subscription.txt")
+	previous, err := os.ReadFile(activePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	var existing []string
+	if err == nil {
+		decoded, decodeErr := base64.StdEncoding.DecodeString(strings.TrimSpace(string(previous)))
+		if decodeErr != nil {
+			return nil, errors.New("previous candidate pool is invalid")
+		}
+		existing = strings.Fields(string(decoded))
+	}
+
+	existingFingerprints := make([]string, 0, len(existing))
+	for _, candidate := range existing {
+		existingFingerprints = append(existingFingerprints, fingerprint(key, candidate))
+	}
+	sources, err := store.CandidateSources(ctx, existingFingerprints)
+	if err != nil {
+		return nil, err
+	}
+	pool := make([]string, 0, len(existing)+len(accepted))
+	seen := make(map[string]struct{}, len(existing)+len(accepted))
+	for index, candidate := range existing {
+		id := existingFingerprints[index]
+		if len(sources[id]) == 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		pool = append(pool, candidate)
+	}
+	for _, candidate := range accepted {
+		id := fingerprint(key, candidate)
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		pool = append(pool, candidate)
+	}
+	if len(pool) > maxPublishedPool {
+		pool = append([]string(nil), pool[len(pool)-maxPublishedPool:]...)
+	}
+	return pool, nil
 }
 
 func (runner BatchRunner) screenSources(ctx context.Context, sources []Source) <-chan sourceScreenResult {

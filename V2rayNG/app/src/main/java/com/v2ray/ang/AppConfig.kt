@@ -19,7 +19,7 @@ object AppConfig {
     // Default subscription ID for ungrouped servers
     const val DEFAULT_SUBSCRIPTION_ID = "__default_subscription__"
     const val FREE_NODE_SUBSCRIPTION_ID = "__free_node_subscription_v1__"
-    const val FREE_NODE_SUBSCRIPTION_URL = "https://freenode.go2base.com/subscription"
+    const val FREE_NODE_SUBSCRIPTION_URL = "https://freenode.go2base.com/manifest"
 
     /** Preferences mapped to MMKV storage. */
     const val PREF_SNIFFING_ENABLED = "pref_sniffing_enabled"
@@ -92,6 +92,7 @@ object AppConfig {
     const val PREF_AUTO_SORT_AFTER_TEST = "pref_auto_sort_after_test"
     const val PREF_REAL_PING_CONCURRENCY = "pref_real_ping_concurrency"
     const val PREF_FREE_NODE_ENABLED = "pref_free_node_enabled"
+    const val PREF_FREE_NODE_FEEDBACK_ENABLED = "pref_free_node_feedback_enabled"
     const val PREF_FREE_NODE_RISK_NOTICE_VERSION = "pref_free_node_risk_notice_version"
     const val PREF_FREE_NODE_POLICY_GROUP_ID = "pref_free_node_policy_group_id"
     const val PREF_FREE_NODE_FINGERPRINT_KEY = "pref_free_node_fingerprint_key"

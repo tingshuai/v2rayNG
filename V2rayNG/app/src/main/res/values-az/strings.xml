@@ -573,6 +573,9 @@
     <string name="free_node_risk_message">Pulsuz qovşaqlar etibarlı deyil. Parol, ödəniş və ya digər həssas trafiki onlardan keçirməyin.</string>
     <string name="free_node_enable_confirm">Başa düşürəm və aktivləşdirirəm</string>
     <string name="free_node_enable_failed">Pulsuz qovşaqları aktivləşdirmək mümkün olmadı.</string>
+    <string name="free_node_no_healthy_candidates">Yerli olaraq yoxlanmış pulsuz qovşaqlar yoxdur. Sürət testini başladın və ya sonra yenidən cəhd edin.</string>
     <string name="free_node_subscription_name">Pulsuz qovşaq namizədləri</string>
     <string name="free_node_policy_group_name">Pulsuz qovşağın avtomatik seçimi</string>
+    <string name="free_node_feedback_title">Anonim yoxlama rəyi göndər</string>
+    <string name="free_node_feedback_summary">Şəbəkə təsdiqləndikdən sonra yalnız ümumi nəticələr və gecikmə aralıqları göndərilir. Konfiqurasiya və cihaz ID-si göndərilmir.</string>
 </resources>

@@ -48,12 +48,14 @@ object FreeNodeProbeScheduler {
 
             return try {
                 CoreNativeManager.initCoreEnv(applicationContext)
+                val reports = mutableListOf<FreeNodeFeedbackReport>()
                 candidates.forEach { (fingerprint, guid) ->
                     currentCoroutineContext().ensureActive()
                     if (isStopped) return Result.success()
                     val delay = RealPingWorkerService.measure(applicationContext, guid)
-                    if (!isStopped) FreeNodeManager.recordProbe(fingerprint, delay)
+                    if (!isStopped) FreeNodeManager.recordProbe(fingerprint, delay)?.let(reports::add)
                 }
+                if (!isStopped) FreeNodeFeedbackClient.submit(applicationContext, reports)
                 Result.success()
             } catch (error: Exception) {
                 LogUtil.e(AppConfig.TAG, "Free-node probe batch failed", error)

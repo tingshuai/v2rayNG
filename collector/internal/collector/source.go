@@ -15,6 +15,7 @@ const (
 )
 
 var ErrSourceNotFound = errors.New("source not found")
+var ErrCandidateNotRevoked = errors.New("candidate is not revoked")
 var ErrNoScreenedCandidates = errors.New("no candidates passed bounded screening")
 
 type Source struct {
@@ -78,6 +79,11 @@ type Store interface {
 	RecordCandidateProbe(ctx context.Context, fingerprint string, succeeded bool, now time.Time) error
 	CandidateQuality(ctx context.Context, fingerprints []string) (map[string]CandidateQuality, error)
 	CandidateSources(ctx context.Context, fingerprints []string) (map[string][]string, error)
+	CandidateRevocations(ctx context.Context) (map[string]string, error)
+	RevokeCandidate(ctx context.Context, fingerprint, reason string) error
+	RestoreCandidate(ctx context.Context, fingerprint, reason string) error
+	RecordFeedback(ctx context.Context, fingerprint, outcome, latencyBucket string, reportedAt time.Time) error
+	RecordFeedbackBatch(ctx context.Context, reports []FeedbackReport, reportedAt time.Time) error
 	RecordCandidateAssignments(ctx context.Context, fingerprints []string) error
 	PruneExpired(ctx context.Context, now time.Time) error
 }
@@ -87,6 +93,35 @@ type PublishedSnapshot struct {
 	ActivePath    string
 	BackupPath    string
 	PublishedAt   time.Time
+}
+
+type FeedbackReport struct {
+	CandidateID   string `json:"candidate_id"`
+	Outcome       string `json:"outcome"`
+	LatencyBucket string `json:"latency_bucket"`
+}
+
+func (report FeedbackReport) Validate() error {
+	if len(report.CandidateID) != 64 {
+		return errors.New("feedback candidate ID is invalid")
+	}
+	for _, char := range report.CandidateID {
+		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
+			return errors.New("feedback candidate ID is invalid")
+		}
+	}
+	if report.Outcome != "success" && report.Outcome != "failure" {
+		return errors.New("feedback outcome is invalid")
+	}
+	switch report.LatencyBucket {
+	case "none", "lt_100", "100_300", "300_1000", "gte_1000":
+	default:
+		return errors.New("feedback latency bucket is invalid")
+	}
+	if report.Outcome == "failure" && report.LatencyBucket != "none" || report.Outcome == "success" && report.LatencyBucket == "none" {
+		return errors.New("feedback latency bucket does not match outcome")
+	}
+	return nil
 }
 
 type RunOutcome string

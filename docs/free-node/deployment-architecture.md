@@ -1,6 +1,6 @@
 # FN-2.0 部署架构
 
-**目标架构，尚未部署。** 测试阶段使用 Hostinger 马来西亚 KVM1、Cloudflare Tunnel、Go collector、SQLite、Docker Compose 与 systemd；这些基础设施可继续使用，但现有容器仍执行旧逻辑。FN-2.0 将在测试环境直接替换旧实现，collector 与 Android 仍独立构建、测试、部署和回退。VPS 不转发用户代理流量。
+**FN-2.0 架构已部署。** 生产使用 Hostinger 马来西亚 KVM1、Cloudflare Tunnel、Go collector、SQLite、Docker 和 systemd 定时器。collector 与 Android 独立构建、测试、部署和回退；VPS 仅提供候选订阅与反馈聚合，不转发用户代理流量。详见 [运行手册](collector-runbook.md)。
 
 ```text
 公开来源 ──> 来源注册表（各自更新周期） ──> 跨来源候选池（不可逆指纹与状态）

@@ -17,6 +17,22 @@ import org.mockito.kotlin.whenever
 
 class SettingsViewModelTest {
     @Test
+    fun freeNodeFeedbackUsesPersistedDefaultAndUpdatesPreferenceAndState() {
+        val application = mock<Application>()
+        var persisted: Boolean? = null
+        val viewModel = SettingsViewModel(application, { persisted ?: true }) { persisted = it }
+
+        assertTrue(viewModel.freeNodeFeedbackEnabled.value)
+        viewModel.setFreeNodeFeedbackEnabled(false)
+        assertFalse(viewModel.freeNodeFeedbackEnabled.value)
+        assertEquals(false, persisted)
+        viewModel.setFreeNodeFeedbackEnabled(true)
+        assertTrue(viewModel.freeNodeFeedbackEnabled.value)
+        assertEquals(true, persisted)
+        assertFalse(viewModel.isLoading.value)
+    }
+
+    @Test
     fun vpnSettingsVisibilityFollowsActivityAvailability() = runBlocking(Dispatchers.IO) {
         val packageManager = mock<PackageManager>()
         val application = mock<Application>()

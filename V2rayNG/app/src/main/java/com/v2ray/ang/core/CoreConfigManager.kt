@@ -5,6 +5,7 @@ import android.text.TextUtils
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.v2ray.ang.AppConfig
+import com.v2ray.ang.R
 import com.v2ray.ang.dto.ConfigResult
 import com.v2ray.ang.dto.CoreConfigContext
 import com.v2ray.ang.dto.V2rayConfig
@@ -42,7 +43,18 @@ object CoreConfigManager {
             if (configContext.isCustom) {
                 return buildV2rayCustomConfig(configContext)
             }
-            return toConfigResult(configContext, buildUnifiedConfig(configContext))
+            val config = buildUnifiedConfig(configContext)
+            val primary = configContext.resolvedOutbounds.firstOrNull()
+            val isFreeNodeGroup = primary?.resolvedType == CoreResolvedType.POLICYGROUP &&
+                primary.profile.policyGroupSubscriptionId == AppConfig.FREE_NODE_SUBSCRIPTION_ID
+            if (isMissingRequiredFreeNodeBalancer(isFreeNodeGroup, config.routing.balancers.orEmpty().map { it.tag }.toSet())) {
+                return ConfigResult(
+                    status = false,
+                    guid = guid,
+                    errorMessage = context.getString(R.string.free_node_no_healthy_candidates),
+                )
+            }
+            return toConfigResult(configContext, config)
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to get V2ray config", e)
             return ConfigResult(
@@ -52,6 +64,9 @@ object CoreConfigManager {
             )
         }
     }
+
+    internal fun isMissingRequiredFreeNodeBalancer(isFreeNodeGroup: Boolean, balancerTags: Set<String>): Boolean =
+        isFreeNodeGroup && AppConfig.TAG_BALANCER !in balancerTags
 
     /**
      * Build a lightweight configuration for latency testing.
