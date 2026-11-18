@@ -1,11 +1,15 @@
 # v2rayNG agent guide
 
+<!-- LOCAL INSTRUCTIONS - START: FreeV2ray autonomous continuation -->
+
 ## Autonomous continuation
 
 - Once the user has supplied a plan or authorized implementation, continue through its in-scope steps in the same task. Do not end a turn after an intermediate implementation, a partial validation result, or a non-blocking environment failure and ask the user to restate the next step.
 - A missing build, test, formatting, or development tool is not a reason to stop work. First attempt a safe, standard installation appropriate to the current machine. If the agent cannot install it automatically, state the exact tool, supported installation command or source, and the specific user action required; continue every remaining in-scope task that does not depend on it.
 - Interrupt only for a material product decision the plan does not resolve, credentials or production access that only the user can provide, an irreversible external action outside the task's implied authority, or a required manual device/environment action that cannot be automated. State the precise blocker and resume automatically after the required input or state change.
 - Do not phrase unfinished work as a future promise such as “I will do the next step” and end the turn. Continue it. A turn may end only when the authorized scope is complete, a true blocker has been reported, or the user explicitly asks to pause.
+
+<!-- LOCAL INSTRUCTIONS - END: FreeV2ray autonomous continuation -->
 
 ## Scope and precedence
 
