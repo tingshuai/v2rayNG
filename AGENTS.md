@@ -296,4 +296,11 @@ behavior for every user who does not opt in.
 - Every implementation PR must state: the source of truth for each decision, which existing v2rayNG
   facility it extends, data retained on device/VPS, and the exact unrun checks if any.
 
+## Connected test-device delivery
+
+- When an authorized Android test device is connected, build and install the latest app on that
+  device after each implementation task before reporting completion. Reuse the connected device
+  automatically; prompt the user for a device only when none is connected. If build or installation
+  is blocked, report the exact blocker and do not claim the device was updated.
+
 <!-- LOCAL INSTRUCTIONS - END: FreeV2ray maintenance -->

@@ -595,6 +595,8 @@
     <string name="fn21_node_semantics">%1$s, %2$s, %3$s</string>
     <string name="fn21_search_nodes">Search nodes or countries</string>
     <string name="fn21_bottom_status">%1$s · %2$d ms</string>
+    <string name="fn22_auto_tag">AUTO</string>
+    <string name="fn22_manual_tag">MANUAL</string>
     <string name="fn21_manual_import">Manual imports</string>
     <string name="fn21_manual_subtitle">Local nodes · no automatic updates</string>
 </resources>

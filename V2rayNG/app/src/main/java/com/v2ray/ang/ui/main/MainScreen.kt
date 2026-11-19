@@ -22,7 +22,6 @@ import com.v2ray.ang.R
 import com.v2ray.ang.AppConfig
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.v2ray.ang.dto.entities.ProfileItem
-import com.v2ray.ang.ui.compose.LocalDarkTheme
 import com.v2ray.ang.ui.compose.QRCodeDialog
 import kotlinx.coroutines.launch
 
@@ -37,11 +36,13 @@ fun MainScreen(
     val isLoading by mainViewModel.isLoading.collectAsStateWithLifecycle()
     val isRunning = uiState.isRunning
     val displayText = mainViewModel.formatStatus(uiState.status)
+    val bottomDisplayText = if (!uiState.showingSubscriptions && uiState.isTesting) {
+        mainViewModel.formatStatus(if (isRunning) MainStatus.Connected else MainStatus.Disconnected)
+    } else displayText
     val selectedGuid = uiState.selectedGuid
     val confirmRemove = uiState.confirmRemove
     val shareQRCodeBitmap = uiState.shareQRCodeBitmap
 
-    val isDarkTheme = LocalDarkTheme.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var showSearch by remember { mutableStateOf(false) }
@@ -158,11 +159,16 @@ fun MainScreen(
             },
             bottomBar = {
                 MainBottomBar(
-                    displayText = displayText,
+                    displayText = bottomDisplayText,
                     selectedServerLabel = uiState.selectedServerLabel,
                     selectedServerDelayMillis = uiState.selectedServerDelayMillis,
+                    connectionGroupLabel = when (uiState.selectedSubscriptionId) {
+                        AppConfig.FREE_NODE_SUBSCRIPTION_ID -> stringResource(R.string.free_node_subscription_name)
+                        AppConfig.DEFAULT_SUBSCRIPTION_ID -> stringResource(R.string.fn21_manual_import)
+                        else -> groups.firstOrNull { it.id == uiState.selectedSubscriptionId }?.remarks.orEmpty()
+                    },
+                    connectionSource = uiState.connectionSource,
                     isRunning = isRunning,
-                    isDarkTheme = isDarkTheme,
                     onAction = onAction
                 )
             },
@@ -196,6 +202,9 @@ fun MainScreen(
                     onEdit = { guid, profile -> onAction(MainAction.EditServer(guid, profile)) },
                     onShare = { guid, profile -> shareTarget = Triple(guid, profile, false) },
                     onRemove = removeServer,
+                    isTesting = uiState.isTesting,
+                    testProgress = (uiState.status as? MainStatus.TestProgress)?.progress,
+                    onTest = { onAction(MainAction.TestRealAllServers) },
                     modifier = Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding),
                 )
             }

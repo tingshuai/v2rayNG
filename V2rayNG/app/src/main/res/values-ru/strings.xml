@@ -600,4 +600,6 @@
     <string name="fn21_bottom_status">%1$s · %2$d мс</string>
     <string name="fn21_manual_import">Ручной импорт</string>
     <string name="fn21_manual_subtitle">Локальные узлы · без автообновления</string>
+    <string name="fn22_auto_tag">АВТО</string>
+    <string name="fn22_manual_tag">ВРУЧНУЮ</string>
 </resources>

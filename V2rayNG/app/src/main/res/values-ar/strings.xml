@@ -604,4 +604,6 @@
     <string name="fn21_bottom_status">%1$s · %2$d مللي ثانية</string>
     <string name="fn21_manual_import">استيراد يدوي</string>
     <string name="fn21_manual_subtitle">عقد محلية · بلا تحديث تلقائي</string>
+    <string name="fn22_auto_tag">تلقائي</string>
+    <string name="fn22_manual_tag">يدوي</string>
 </resources>

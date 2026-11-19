@@ -1,6 +1,8 @@
 package com.v2ray.ang.ui.main
 
 import com.v2ray.ang.dto.entities.ProfileItem
+import com.v2ray.ang.dto.entities.ServersCache
+import com.v2ray.ang.dto.ConnectionTestResult
 import com.v2ray.ang.enums.EConfigType
 import java.util.Locale
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -35,5 +37,24 @@ class MainListInteractionTest {
         assertEquals(LatencyTone.MODERATE, latencyTone(201))
         assertEquals(LatencyTone.MODERATE, latencyTone(500))
         assertEquals(LatencyTone.SLOW, latencyTone(501))
+    }
+
+    @Test
+    fun successfulTestedNodesMoveFirstAndFailuresKeepTheirRelativeOrder() {
+        val servers = listOf(0L, -1L, 145L, 0L, 90L, -5L).mapIndexed { index, delay ->
+            ServersCache(guid = "server-$index", profile = ProfileItem(configType = EConfigType.VMESS), testDelayMillis = delay)
+        }
+
+        assertEquals(
+            listOf("server-2", "server-4", "server-0", "server-1", "server-3", "server-5"),
+            orderTestedServersFirst(servers).map { it.guid },
+        )
+    }
+
+    @Test
+    fun failedDelayCheckDoesNotReplaceConnectedStatusWithFailureMessage() {
+        assertEquals(MainStatus.Connected, connectionTestStatus(ConnectionTestResult(-1, "timeout", null, null)))
+        val success = ConnectionTestResult(42, "", "US", "203.0.113.2")
+        assertEquals(MainStatus.ConnectionTest(success), connectionTestStatus(success))
     }
 }

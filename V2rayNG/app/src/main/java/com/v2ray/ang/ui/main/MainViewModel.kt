@@ -114,6 +114,9 @@ class MainViewModel(
             selectedSubscriptionId = dataSource.getSelectedSubscriptionId(),
             selectedGroupId = dataSource.getSelectedSubscriptionId(),
             selectedGuid = dataSource.getSelectServer(),
+            connectionSource = if (
+                dataSource.getSelectServer()?.let(dataSource::decodeServerConfig)?.configType == EConfigType.POLICYGROUP
+            ) ConnectionSource.SUBSCRIPTION else ConnectionSource.DIRECT_SERVER,
             confirmRemove = dataSource.getConfirmRemove(),
             doubleColumnDisplay = dataSource.getDoubleColumnDisplay()
         )
@@ -180,7 +183,7 @@ class MainViewModel(
             MainServiceEvent.StateStopSuccess -> updateRunningState(false)
             is MainServiceEvent.MeasureDelayResult -> {
                 if (!uiState.value.isRunning || !testRequests.completeCurrent(event.requestId)) return
-                _uiState.update { it.copy(isTesting = testRequests.isTesting, status = MainStatus.ConnectionTest(event.result)) }
+                _uiState.update { it.copy(isTesting = testRequests.isTesting, status = connectionTestStatus(event.result)) }
             }
 
             is MainServiceEvent.MeasureConfigSuccess -> {
@@ -246,14 +249,25 @@ class MainViewModel(
         if (testRequests.bulk?.id != request.id) return
         mutableServerGroupState(request.groupId).update { current ->
             current.copy(
-                servers = applyTestDelayResults(current.servers, updates),
-                rows = applyTestDelayResultsToRows(current.rows, updates),
+                servers = orderTestedServersFirst(applyTestDelayResults(current.servers, updates)),
+                rows = applyTestDelayResultsToRows(current.rows, updates).withSuccessfulRowsFirst(),
             )
         }
         _uiState.update { state ->
             state.selectedGuid?.let(updates::get)?.let { state.copy(selectedServerDelayMillis = it) } ?: state
         }
+        cacheMutex.withLock {
+            groupDataCache[request.groupId]?.let { cached ->
+                groupDataCache[request.groupId] = orderTestedServersFirst(cached)
+            }
+        }
     }
+
+    private fun List<ServerRowUiModel>.withSuccessfulRowsFirst(): List<ServerRowUiModel> =
+        withIndex()
+            .sortedWith(compareByDescending<IndexedValue<ServerRowUiModel>> { it.value.testDelayMillis > 0L }
+                .thenBy { it.index })
+            .map { it.value }
 
     internal fun formatStatus(status: MainStatus): String = when (status) {
         MainStatus.Disconnected -> dataSource.getString(R.string.connection_not_connected)
@@ -536,6 +550,7 @@ class MainViewModel(
                         selectedSubscriptionId = selectedGroup,
                         selectedGroupId = viewedGroup,
                         selectedGuid = selectedServerGuid,
+                        connectionSource = if (viewedGroup.isNotBlank()) ConnectionSource.SUBSCRIPTION else ConnectionSource.DIRECT_SERVER,
                     )
                 }
                 groups.forEach { mutableServerGroupState(it.id) }
@@ -787,6 +802,8 @@ class MainViewModel(
         if (uiState.value.selectedGroupId != id || uiState.value.selectedSubscriptionId != id) {
             dataSource.setSelectedSubscriptionId(id)
             _uiState.update { it.withSelectedSubscription(id) }
+        } else if (isSelectingConnectionCollection) {
+            _uiState.update { it.copy(connectionSource = ConnectionSource.SUBSCRIPTION) }
         }
         if (isSelectingConnectionCollection) {
             ensurePolicyGroupSelection(id)
@@ -872,7 +889,7 @@ class MainViewModel(
 
     fun updateSelectedGuid(guid: String) {
         dataSource.setSelectServer(guid)
-        _uiState.update { it.copy(selectedGuid = guid) }
+        _uiState.update { it.copy(selectedGuid = guid, connectionSource = ConnectionSource.DIRECT_SERVER) }
         refreshSelectedServerInfo()
         dataSource.decodeServerConfig(guid)?.subscriptionId
             ?.takeIf { it == _uiState.value.selectedGroupId }
@@ -957,17 +974,9 @@ class MainViewModel(
             return
         }
         val serverGuids = servers.map { it.guid }
+        updateServerTestState(groupId, serverGuids.associateWith { 0L })
         mutableServerGroupState(groupId).update { current ->
-            current.copy(
-                servers = current.servers.map { server ->
-                    if (server.testDelayMillis == 0L) server
-                    else server.copy(testDelayMillis = 0L)
-                },
-                rows = current.rows.map { row ->
-                    if (row.testDelayMillis == 0L) row
-                    else row.copy(testDelayMillis = 0L)
-                }
-            )
+            current.copy(servers = orderTestedServersFirst(current.servers), rows = current.rows.withSuccessfulRowsFirst())
         }
         val request = testRequests.beginBulk(groupId)
         val message = TestServiceMessage(
@@ -999,6 +1008,23 @@ class MainViewModel(
         }
     }
 
+    private fun updateServerTestState(groupId: String, updates: Map<String, Long>) {
+        if (updates.isEmpty()) return
+        val flow = mutableServerGroupState(groupId)
+        flow.update { current ->
+            val updatedServers = current.servers.map { server ->
+                updates[server.guid]?.let { server.copy(testDelayMillis = it) } ?: server
+            }
+            val updatedRows = current.rows.map { row ->
+                updates[row.guid]?.let { row.copy(testDelayMillis = it) } ?: row
+            }
+            current.copy(
+                servers = orderTestedServersFirst(updatedServers),
+                rows = updatedRows.withSuccessfulRowsFirst(),
+            )
+        }
+    }
+
     private fun cancelPendingTestResults() {
         testResultFlushJob?.cancel()
         testResultFlushJob = null
@@ -1013,9 +1039,10 @@ class MainViewModel(
     }
 
     private fun onTestsFinished(requestId: String) {
-        if (testRequests.completeBulk(requestId) == null) return
+        val request = testRequests.completeBulk(requestId) ?: return
         resetTestStatus()
         viewModelScope.launch(ioDispatcher) {
+            dataSource.sortByTestResultsForSub(request.groupId)
             cacheMutex.withLock { groupDataCache.clear() }
             reloadAllGroups(_uiState.value.groups.map { it.id })
         }

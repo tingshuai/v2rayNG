@@ -594,4 +594,6 @@
     <string name="fn21_bottom_status">%1$s · %2$d 毫秒</string>
     <string name="fn21_manual_import">手動匯入</string>
     <string name="fn21_manual_subtitle">本機節點 · 不自動更新</string>
+    <string name="fn22_auto_tag">訂閱自動</string>
+    <string name="fn22_manual_tag">手動節點</string>
 </resources>

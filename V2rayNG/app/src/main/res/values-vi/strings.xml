@@ -594,4 +594,6 @@
     <string name="fn21_bottom_status">%1$s · %2$d ms</string>
     <string name="fn21_manual_import">Nhập thủ công</string>
     <string name="fn21_manual_subtitle">Nút cục bộ · không tự cập nhật</string>
+    <string name="fn22_auto_tag">TỰ ĐỘNG</string>
+    <string name="fn22_manual_tag">THỦ CÔNG</string>
 </resources>

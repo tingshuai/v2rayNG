@@ -3,6 +3,7 @@ package com.v2ray.ang.ui.main
 import com.v2ray.ang.dto.ConnectionTestResult
 import com.v2ray.ang.dto.GroupMapItem
 import com.v2ray.ang.dto.LocateTarget
+import com.v2ray.ang.dto.entities.ServersCache
 
 /** Locale-neutral state formatted only when it reaches the main UI. */
 sealed interface MainStatus {
@@ -26,6 +27,7 @@ data class MainUiState(
     val isRunning: Boolean = false,
     val isTesting: Boolean = false,
     val status: MainStatus = MainStatus.Disconnected,
+    val connectionSource: ConnectionSource = ConnectionSource.DIRECT_SERVER,
     val locateTarget: LocateTarget? = null,
     val confirmRemove: Boolean = false,
     val doubleColumnDisplay: Boolean = false,
@@ -34,11 +36,16 @@ data class MainUiState(
     val selectedCountryCode: String? = null,
 )
 
+enum class ConnectionSource { SUBSCRIPTION, DIRECT_SERVER }
+
 internal fun MainUiState.withSelectedSubscription(groupId: String): MainUiState =
-    copy(selectedSubscriptionId = groupId, selectedGroupId = groupId)
+    copy(selectedSubscriptionId = groupId, selectedGroupId = groupId, connectionSource = ConnectionSource.SUBSCRIPTION)
 
 internal fun MainUiState.withOpenedSubscription(groupId: String): MainUiState =
     copy(selectedGroupId = groupId, showingSubscriptions = false, selectedCountryCode = null)
+
+internal fun connectionTestStatus(result: ConnectionTestResult): MainStatus =
+    if (result.delayMillis < 0L) MainStatus.Connected else MainStatus.ConnectionTest(result)
 
 /**
  * All possible user interaction intents
@@ -84,3 +91,9 @@ sealed interface MainAction {
 
     data object LocateHandled : MainAction
 }
+
+internal fun orderTestedServersFirst(servers: List<ServersCache>): List<ServersCache> =
+    servers.withIndex()
+        .sortedWith(compareByDescending<IndexedValue<com.v2ray.ang.dto.entities.ServersCache>> { it.value.testDelayMillis > 0L }
+            .thenBy { it.index })
+        .map { it.value }
