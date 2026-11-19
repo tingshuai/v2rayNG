@@ -398,7 +398,7 @@
     <string name="routing_settings_outbound_tag_hint">proxy / direct / block / &lt;%1$s&gt;</string>
     <string name="routing_settings_outbound_tag" translatable="false">outboundTag</string>
 
-    <string name="connection_test_pending">Check connectivity</string>
+    <string name="connection_test_pending">Test nodes</string>
     <string name="connection_test_testing">Testing…</string>
     <string name="connection_test_testing_count">Testing %d configs…</string>
     <string name="connection_test_available">Connection succeeded in %1$s</string>
@@ -590,7 +590,7 @@
     <string name="fn21_failed">Failed</string>
     <string name="fn21_free_subtitle">Candidate list · automatically updated</string>
     <string name="fn21_user_subtitle">Saved subscription · automatic updates when enabled</string>
-    <string name="fn21_node_summary">%1$d nodes · %2$d tested</string>
+    <string name="fn21_node_summary">%1$d nodes · %2$d tested · %3$d passed · %4$d failed</string>
     <string name="fn21_healthy">Healthy</string>
     <string name="fn21_node_semantics">%1$s, %2$s, %3$s</string>
     <string name="fn21_search_nodes">Search nodes or countries</string>

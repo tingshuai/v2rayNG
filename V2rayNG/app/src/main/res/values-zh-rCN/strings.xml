@@ -396,7 +396,7 @@
     <string name="routing_settings_outbound_tag_hint">proxy / direct / block / &lt;%1$s&gt;</string>
     <string name="routing_settings_outbound_tag" translatable="false">outboundTag</string>
 
-    <string name="connection_test_pending">"检查网络连接"</string>
+    <string name="connection_test_pending">节点测试</string>
     <string name="connection_test_testing">"测试中…"</string>
     <string name="connection_test_testing_count">测试 %d 个配置中…</string>
     <string name="connection_test_available">"连接成功：延时 %1$s"</string>
@@ -587,7 +587,7 @@
     <string name="fn21_failed">连接失败</string>
     <string name="fn21_free_subtitle">候选列表 · 自动更新</string>
     <string name="fn21_user_subtitle">订阅地址已保存 · 按设置自动更新</string>
-    <string name="fn21_node_summary">%1$d 个节点 · 已测 %2$d 个</string>
+    <string name="fn21_node_summary">%1$d 个节点 · 已测 %2$d · 通过 %3$d · 失败 %4$d</string>
     <string name="fn21_healthy">连接正常</string>
     <string name="fn21_node_semantics">%1$s，%2$s，%3$s</string>
     <string name="fn21_search_nodes">搜索节点或国家</string>

@@ -49,6 +49,19 @@ fun MainBottomBar(
 ) {
     val scope = rememberCoroutineScope()
     val rotationAnim = remember { Animatable(0f) }
+    val connectionButtonTone = if (isRunning) LatencyTone.FAST else latencyTone(selectedServerDelayMillis)
+    val connectionButtonColor = when (connectionButtonTone) {
+        LatencyTone.FAST -> MaterialTheme.colorScheme.tertiary
+        LatencyTone.MODERATE -> MaterialTheme.colorScheme.secondary
+        LatencyTone.SLOW, LatencyTone.FAILED -> MaterialTheme.colorScheme.error
+        LatencyTone.UNKNOWN -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val connectionButtonContentColor = when (connectionButtonTone) {
+        LatencyTone.FAST -> MaterialTheme.colorScheme.onTertiary
+        LatencyTone.MODERATE -> MaterialTheme.colorScheme.onSecondary
+        LatencyTone.SLOW, LatencyTone.FAILED -> MaterialTheme.colorScheme.onError
+        LatencyTone.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     LaunchedEffect(isRunning) {
         if (!isRunning) {
@@ -119,7 +132,7 @@ fun MainBottomBar(
                 .padding(end = 24.dp)
                 .offset(y = (-28).dp)
                 .navigationBarsPadding(),
-            containerColor = if (isRunning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            containerColor = connectionButtonColor,
         ) {
             Icon(
                 painter = if (isRunning) painterResource(R.drawable.ic_stop_24dp)
@@ -127,7 +140,7 @@ fun MainBottomBar(
                 contentDescription = stringResource(
                     if (isRunning) R.string.acc_stop else R.string.acc_start
                 ),
-                tint = if (isRunning) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
+                tint = connectionButtonContentColor,
                 modifier = Modifier
                     .size(24.dp)
                     .graphicsLayer { rotationZ = rotationAnim.value }

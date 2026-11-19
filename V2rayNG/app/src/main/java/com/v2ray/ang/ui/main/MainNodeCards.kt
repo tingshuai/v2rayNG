@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -126,12 +127,20 @@ internal fun NodeCardsContent(
             SubscriptionInfoCard(info = usageInfo, fallbackTitle = groupTitle, onOpenLink = onOpenLink, onRefresh = onRefresh)
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             val measured = visibleRows.count { it.testDelayMillis != 0L }
-            Text(stringResource(R.string.fn21_node_summary, visibleRows.size, measured), style = MaterialTheme.typography.bodySmall)
+            val passed = visibleRows.count { it.testDelayMillis > 0L }
+            val failed = visibleRows.count { it.testDelayMillis < 0L }
+            Text(
+                stringResource(R.string.fn21_node_summary, visibleRows.size, measured, passed, failed),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (isTesting) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -139,7 +148,17 @@ internal fun NodeCardsContent(
                         ?: stringResource(R.string.connection_test_testing), style = MaterialTheme.typography.bodySmall)
                 }
             } else {
-                TextButton(onClick = onTest, enabled = !isTesting) {
+                TextButton(
+                    onClick = onTest,
+                    enabled = !isTesting,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_speed_24dp),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.size(6.dp))
                     Text(stringResource(R.string.connection_test_pending))
                 }
             }

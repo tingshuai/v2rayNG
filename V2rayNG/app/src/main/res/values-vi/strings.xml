@@ -396,7 +396,7 @@
     <string name="routing_settings_outbound_tag_hint">proxy / direct / block / &lt;%1$s&gt;</string>
     <string name="routing_settings_outbound_tag" translatable="false">outboundTag</string>
 
-    <string name="connection_test_pending">Kiểm tra kết nối</string>
+    <string name="connection_test_pending">Kiểm tra nút</string>
     <string name="connection_test_testing">Đang kiểm tra kết nối mạng…</string>
     <string name="connection_test_testing_count">Đang kiểm tra %d cấu hình…</string>
     <string name="connection_test_available">Kết nối thành công sau %1$s</string>
@@ -587,7 +587,7 @@
     <string name="fn21_failed">Thất bại</string>
     <string name="fn21_free_subtitle">Danh sách ứng viên · tự động cập nhật</string>
     <string name="fn21_user_subtitle">Đã lưu đăng ký · cập nhật theo cài đặt</string>
-    <string name="fn21_node_summary">%1$d nút · đã kiểm tra %2$d</string>
+    <string name="fn21_node_summary">%1$d nút · đã kiểm tra %2$d · đạt %3$d · lỗi %4$d</string>
     <string name="fn21_healthy">Hoạt động</string>
     <string name="fn21_node_semantics">%1$s, %2$s, %3$s</string>
     <string name="fn21_search_nodes">Tìm nút hoặc quốc gia</string>

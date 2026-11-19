@@ -398,7 +398,7 @@
     <string name="routing_settings_outbound_tag_hint">proxy / direct / block / &lt;%1$s&gt;</string>
     <string name="routing_settings_outbound_tag" translatable="false">outboundTag</string>
 
-    <string name="connection_test_pending">সংযোগ পরীক্ষা করুন</string>
+    <string name="connection_test_pending">নোড পরীক্ষা</string>
     <string name="connection_test_testing">পরীক্ষা চলছে…</string>
     <string name="connection_test_testing_count">%dটি কনফিগারেশন পরীক্ষা করা হচ্ছে…</string>
     <string name="connection_test_available">সংযোগ সফল হয়েছে; সময় লেগেছে %1$s</string>
@@ -589,7 +589,7 @@
     <string name="fn21_failed">ব্যর্থ</string>
     <string name="fn21_free_subtitle">প্রার্থী তালিকা · স্বয়ংক্রিয় আপডেট</string>
     <string name="fn21_user_subtitle">সাবস্ক্রিপশন সংরক্ষিত · সেটিং অনুযায়ী আপডেট</string>
-    <string name="fn21_node_summary">%1$d নোড · %2$d পরীক্ষিত</string>
+    <string name="fn21_node_summary">%1$d নোড · পরীক্ষিত %2$d · সফল %3$d · ব্যর্থ %4$d</string>
     <string name="fn21_healthy">সচল</string>
     <string name="fn21_node_semantics">%1$s, %2$s, %3$s</string>
     <string name="fn21_search_nodes">নোড বা দেশ খুঁজুন</string>

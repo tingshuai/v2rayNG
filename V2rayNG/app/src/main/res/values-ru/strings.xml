@@ -402,7 +402,7 @@
     <string name="routing_settings_outbound_tag_hint">proxy / direct / block / &lt;%1$s&gt;</string>
     <string name="routing_settings_outbound_tag" translatable="false">outboundTag</string>
 
-    <string name="connection_test_pending">Проверить соединение</string>
+    <string name="connection_test_pending">Проверить узлы</string>
     <string name="connection_test_testing">Проверка…</string>
     <string name="connection_test_testing_count">Проверка профилей (%d)…</string>
     <string name="connection_test_available">Соединение установлено за %1$s</string>
@@ -593,7 +593,7 @@
     <string name="fn21_failed">Ошибка</string>
     <string name="fn21_free_subtitle">Список кандидатов · автообновление</string>
     <string name="fn21_user_subtitle">Подписка сохранена · обновление по настройкам</string>
-    <string name="fn21_node_summary">%1$d узлов · проверено %2$d</string>
+    <string name="fn21_node_summary">%1$d узлов · проверено %2$d · успешно %3$d · неудачно %4$d</string>
     <string name="fn21_healthy">Работает</string>
     <string name="fn21_node_semantics">%1$s, %2$s, %3$s</string>
     <string name="fn21_search_nodes">Поиск узла или страны</string>

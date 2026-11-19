@@ -406,7 +406,7 @@
     <string name="routing_settings_outbound_tag_hint">proxy / direct / block / &lt;%1$s&gt;</string>
     <string name="routing_settings_outbound_tag" translatable="false">outboundTag</string>
 
-    <string name="connection_test_pending">التحقق من الاتصال</string>
+    <string name="connection_test_pending">اختبار العقد</string>
     <string name="connection_test_testing">يجري الاختبار…</string>
     <string name="connection_test_testing_count">جارٍ اختبار %d من التكوينات…</string>
     <string name="connection_test_available">تم الاتصال بنجاح خلال %1$s</string>
@@ -597,7 +597,7 @@
     <string name="fn21_failed">فشل</string>
     <string name="fn21_free_subtitle">قائمة المرشحين · تحديث تلقائي</string>
     <string name="fn21_user_subtitle">الاشتراك محفوظ · تحديث حسب الإعدادات</string>
-    <string name="fn21_node_summary">%1$d عقد · تم اختبار %2$d</string>
+    <string name="fn21_node_summary">%1$d عقد · اختُبر %2$d · نجح %3$d · فشل %4$d</string>
     <string name="fn21_healthy">تعمل</string>
     <string name="fn21_node_semantics">%1$s، %2$s، %3$s</string>
     <string name="fn21_search_nodes">ابحث عن عقدة أو بلد</string>

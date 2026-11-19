@@ -398,7 +398,7 @@
     <string name="routing_settings_outbound_tag_hint">proxy / direct / block / &lt;%1$s&gt;</string>
     <string name="routing_settings_outbound_tag" translatable="false">outboundTag</string>
 
-    <string name="connection_test_pending">اتصال را بررسی کنید</string>
+    <string name="connection_test_pending">آزمایش گره‌ها</string>
     <string name="connection_test_testing">در حال آزمایش…</string>
     <string name="connection_test_testing_count">تست کردن %d کانفیگ…</string>
     <string name="connection_test_available">اتصال در %1$s با موفقیت برقرار شد</string>
@@ -589,7 +589,7 @@
     <string name="fn21_failed">ناموفق</string>
     <string name="fn21_free_subtitle">فهرست گزینه‌ها · به‌روزرسانی خودکار</string>
     <string name="fn21_user_subtitle">اشتراک ذخیره شد · به‌روزرسانی طبق تنظیمات</string>
-    <string name="fn21_node_summary">%1$d گره · %2$d آزمایش‌شده</string>
+    <string name="fn21_node_summary">%1$d گره · آزمایش‌شده %2$d · موفق %3$d · ناموفق %4$d</string>
     <string name="fn21_healthy">سالم</string>
     <string name="fn21_node_semantics">%1$s، %2$s، %3$s</string>
     <string name="fn21_search_nodes">جستجوی گره یا کشور</string>
