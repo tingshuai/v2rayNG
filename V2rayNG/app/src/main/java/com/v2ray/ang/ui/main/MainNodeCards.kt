@@ -65,6 +65,24 @@ internal fun latencyTone(delayMillis: Long): LatencyTone = when {
 }
 
 @Composable
+private fun NodeCardMenu(
+    row: ServerRowUiModel,
+    onEdit: (String, ProfileItem) -> Unit,
+    onShare: (String, ProfileItem) -> Unit,
+    onRemove: (String, String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    IconButton(onClick = { expanded = true }) {
+        Icon(painterResource(R.drawable.ic_more_vert_24dp), contentDescription = stringResource(R.string.acc_more))
+    }
+    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenuItem(text = { Text(stringResource(R.string.acc_edit)) }, onClick = { expanded = false; onEdit(row.guid, row.profile) })
+        DropdownMenuItem(text = { Text(stringResource(R.string.title_configuration_share)) }, onClick = { expanded = false; onShare(row.guid, row.profile) })
+        DropdownMenuItem(text = { Text(stringResource(R.string.acc_delete)) }, onClick = { expanded = false; onRemove(row.guid, row.remarks) })
+    }
+}
+
+@Composable
 internal fun NodeCardsContent(
     groupId: String,
     mainViewModel: MainViewModel,

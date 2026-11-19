@@ -302,5 +302,10 @@ behavior for every user who does not opt in.
   device after each implementation task before reporting completion. Reuse the connected device
   automatically; prompt the user for a device only when none is connected. If build or installation
   is blocked, report the exact blocker and do not claim the device was updated.
+- On this workstation, set the Gradle process `TEMP` and `TMP` to
+  `D:\CodexData\CodexDownloads\tmp` before invoking Gradle. The default Windows temp path contains
+  the short-name component `ADMINI~1`, which makes Java's local selector socket connection fail.
+  Set `GRADLE_USER_HOME` to `D:\CodexData\CodexDownloads\gradle` as well so Gradle downloads and
+  caches remain under the designated downloads directory.
 
 <!-- LOCAL INSTRUCTIONS - END: FreeV2ray maintenance -->
