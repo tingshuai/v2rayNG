@@ -576,6 +576,7 @@
     <string name="free_node_feedback_title">Gửi phản hồi kiểm tra ẩn danh</string>
     <string name="free_node_feedback_summary">Chỉ gửi kết quả khái quát và khoảng độ trễ khi mạng đã xác thực. Không gửi cấu hình hoặc mã thiết bị.</string>
     <string name="fn21_subscriptions">Danh sách đăng ký</string>
+    <string name="fn21_open_nodes">Danh sách nút</string>
     <string name="fn21_counts">%1$d nút · %2$d hoạt động · %3$d lỗi · %4$d chưa kiểm tra</string>
     <string name="fn21_free_fixed">Không thể xóa</string>
     <string name="fn21_back">Quay lại</string>

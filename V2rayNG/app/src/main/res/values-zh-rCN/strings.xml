@@ -576,6 +576,7 @@
     <string name="free_node_feedback_title">发送匿名探测反馈</string>
     <string name="free_node_feedback_summary">网络确认可用后，仅发送粗略结果和延迟范围，不发送节点配置或设备标识。</string>
     <string name="fn21_subscriptions">订阅列表</string>
+    <string name="fn21_open_nodes">节点列表</string>
     <string name="fn21_counts">%1$d 个节点 · %2$d 个正常 · %3$d 个失败 · %4$d 个未测试</string>
     <string name="fn21_free_fixed">不可删除</string>
     <string name="fn21_back">返回</string>

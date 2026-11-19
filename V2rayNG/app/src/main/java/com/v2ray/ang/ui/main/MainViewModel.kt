@@ -104,6 +104,7 @@ class MainViewModel(
     // ---------- UI state ----------
     private val _uiState = MutableStateFlow(
         MainUiState(
+            selectedSubscriptionId = dataSource.getSelectedSubscriptionId(),
             selectedGroupId = dataSource.getSelectedSubscriptionId(),
             selectedGuid = dataSource.getSelectServer(),
             confirmRemove = dataSource.getConfirmRemove(),
@@ -316,10 +317,7 @@ class MainViewModel(
             is MainAction.UpdateGroupSubscription -> importConfigViaSub(action.groupId)
             MainAction.ExportAll -> exportAllAsync()
             is MainAction.SelectGroup -> subscriptionIdChanged(action.groupId)
-            is MainAction.OpenSubscription -> {
-                subscriptionIdChanged(action.groupId)
-                _uiState.update { it.copy(showingSubscriptions = false, selectedCountryCode = null) }
-            }
+            is MainAction.OpenSubscription -> openSubscription(action.groupId)
             MainAction.CloseSubscription -> _uiState.update { it.copy(showingSubscriptions = true, selectedCountryCode = null) }
             is MainAction.FilterCountry -> _uiState.update { it.copy(selectedCountryCode = action.countryCode) }
             is MainAction.SelectServer -> updateSelectedGuid(action.guid)
@@ -468,7 +466,7 @@ class MainViewModel(
     fun getSubscriptions(): List<SubscriptionCache> = dataSource.getSubscriptions()
 
     private fun resolveSelectedGroup(groups: List<GroupMapItem>): String {
-        val current = uiState.value.selectedGroupId
+        val current = uiState.value.selectedSubscriptionId
         val resolved = when {
             groups.isEmpty() -> ""
             groups.any { it.id == current } -> current
@@ -513,6 +511,7 @@ class MainViewModel(
                     )
                 }
                 val selectedGroup = resolveSelectedGroup(groups)
+                val viewedGroup = uiState.value.selectedGroupId.takeIf { id -> groups.any { it.id == id } } ?: selectedGroup
                 val validIds = groups.mapTo(HashSet()) { it.id }
                 groupUiFlows.keys.removeAll { it !in validIds }
                 groupServerFlows.keys.removeAll { it !in validIds }
@@ -521,7 +520,8 @@ class MainViewModel(
                 _uiState.update {
                     it.copy(
                         groups = groups,
-                        selectedGroupId = selectedGroup,
+                        selectedSubscriptionId = selectedGroup,
+                        selectedGroupId = viewedGroup,
                         selectedGuid = dataSource.getSelectServer(),
                     )
                 }
@@ -770,10 +770,21 @@ class MainViewModel(
     fun subscriptionIdChanged(id: String) {
         if (_uiState.value.groups.none { it.id == id }) return
         mutableServerGroupState(id)
-        if (uiState.value.selectedGroupId != id) {
+        if (uiState.value.selectedGroupId != id || uiState.value.selectedSubscriptionId != id) {
             dataSource.setSelectedSubscriptionId(id)
-            _uiState.update { it.copy(selectedGroupId = id) }
+            _uiState.update { it.withSelectedSubscription(id) }
         }
+        loadSelectedGroup(id)
+    }
+
+    private fun openSubscription(id: String) {
+        if (_uiState.value.groups.none { it.id == id }) return
+        mutableServerGroupState(id)
+        _uiState.update { it.withOpenedSubscription(id) }
+        loadSelectedGroup(id)
+    }
+
+    private fun loadSelectedGroup(id: String) {
         selectedGroupLoadJob?.cancel()
         selectedGroupLoadJob = viewModelScope.launch(ioDispatcher) {
             try {
@@ -829,6 +840,10 @@ class MainViewModel(
         dataSource.setSelectServer(guid)
         _uiState.update { it.copy(selectedGuid = guid) }
         refreshSelectedServerInfo()
+        dataSource.decodeServerConfig(guid)?.subscriptionId
+            ?.takeIf { it == _uiState.value.selectedGroupId }
+            ?.takeIf { it != _uiState.value.selectedSubscriptionId }
+            ?.let(::subscriptionIdChanged)
     }
 
     fun refreshSelectedGuid() {
@@ -984,7 +999,7 @@ class MainViewModel(
             }
             val target = LocateTarget(groupId, selected)
             _uiState.update {
-                it.copy(selectedGroupId = groupId, locateTarget = target, showingSubscriptions = false)
+                it.copy(selectedSubscriptionId = groupId, selectedGroupId = groupId, locateTarget = target, showingSubscriptions = false)
             }
         }
     }

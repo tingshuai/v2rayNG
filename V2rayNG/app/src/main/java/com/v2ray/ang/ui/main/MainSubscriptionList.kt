@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +63,7 @@ internal fun SubscriptionListContent(
     groups: List<GroupMapItem>,
     mainViewModel: MainViewModel,
     selectedGroupId: String,
+    onSelect: (String) -> Unit,
     onOpen: (String) -> Unit,
     onManage: () -> Unit,
     onUpdate: (String) -> Unit,
@@ -81,7 +83,7 @@ internal fun SubscriptionListContent(
             val isSelected = group.id == selectedGroupId
             val label = stringResource(R.string.fn21_subscription_summary, title, counts.total, counts.healthy, counts.failed, counts.untested)
             Card(
-                onClick = { onOpen(group.id) },
+                onClick = { onSelect(group.id) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
                     .semantics { selected = isSelected; contentDescription = label },
                 colors = CardDefaults.cardColors(containerColor = if (isSelected) selectedBackground else MaterialTheme.colorScheme.surface),
@@ -90,7 +92,7 @@ internal fun SubscriptionListContent(
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(30.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape), contentAlignment = Alignment.Center) {
-                            Text(if (isFree) "✓" else title.take(1).uppercase(), style = MaterialTheme.typography.labelMedium)
+                            Text(if (isSelected) "✓" else title.take(1).uppercase(), style = MaterialTheme.typography.labelMedium)
                         }
                         Spacer(Modifier.size(10.dp))
                         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -115,6 +117,12 @@ internal fun SubscriptionListContent(
                     val latestTestAt = state.servers.maxOfOrNull { it.lastTestAt } ?: 0L
                     if (latestTestAt > 0L) {
                         Text(stringResource(R.string.fn21_last_test, Utils.formatTimestamp(latestTestAt, "yyyy-MM-dd HH:mm")), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { onOpen(group.id) }) {
+                            Text(stringResource(R.string.fn21_open_nodes))
+                            Text("  ›", color = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
             }

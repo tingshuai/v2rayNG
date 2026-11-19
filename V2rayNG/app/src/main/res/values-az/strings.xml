@@ -579,6 +579,7 @@
     <string name="free_node_feedback_title">Anonim yoxlama rəyi göndər</string>
     <string name="free_node_feedback_summary">Şəbəkə təsdiqləndikdən sonra yalnız ümumi nəticələr və gecikmə aralıqları göndərilir. Konfiqurasiya və cihaz ID-si göndərilmir.</string>
     <string name="fn21_subscriptions">Abunəliklər</string>
+    <string name="fn21_open_nodes">Qovşaqların siyahısı</string>
     <string name="fn21_counts">%1$d qovşaq · %2$d işləyir · %3$d uğursuz · %4$d yoxlanmayıb</string>
     <string name="fn21_free_fixed">Silinmir</string>
     <string name="fn21_back">Geri</string>

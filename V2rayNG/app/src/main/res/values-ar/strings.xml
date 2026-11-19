@@ -586,6 +586,7 @@
     <string name="free_node_feedback_title">إرسال ملاحظات اختبار مجهولة</string>
     <string name="free_node_feedback_summary">بعد التحقق من اتصال الشبكة، تُرسل النتائج العامة ونطاقات زمن الاستجابة فقط. لا يُرسل الإعداد أو معرّف الجهاز.</string>
     <string name="fn21_subscriptions">الاشتراكات</string>
+    <string name="fn21_open_nodes">قائمة العقد</string>
     <string name="fn21_counts">%1$d عقد · %2$d تعمل · %3$d فشلت · %4$d غير مختبرة</string>
     <string name="fn21_free_fixed">لا يمكن الحذف</string>
     <string name="fn21_back">رجوع</string>

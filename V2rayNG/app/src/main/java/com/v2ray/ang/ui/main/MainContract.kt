@@ -18,6 +18,7 @@ sealed interface MainStatus {
  */
 data class MainUiState(
     val groups: List<GroupMapItem> = emptyList(),
+    val selectedSubscriptionId: String = "",
     val selectedGroupId: String = "",
     val selectedGuid: String? = null,
     val selectedServerLabel: String? = null,
@@ -32,6 +33,12 @@ data class MainUiState(
     val showingSubscriptions: Boolean = true,
     val selectedCountryCode: String? = null,
 )
+
+internal fun MainUiState.withSelectedSubscription(groupId: String): MainUiState =
+    copy(selectedSubscriptionId = groupId, selectedGroupId = groupId)
+
+internal fun MainUiState.withOpenedSubscription(groupId: String): MainUiState =
+    copy(selectedGroupId = groupId, showingSubscriptions = false, selectedCountryCode = null)
 
 /**
  * All possible user interaction intents

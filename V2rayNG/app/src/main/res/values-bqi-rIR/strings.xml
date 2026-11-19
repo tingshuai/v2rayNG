@@ -578,6 +578,7 @@
     <string name="free_node_feedback_title">Anonymous probe feedback</string>
     <string name="free_node_feedback_summary">Only coarse results and latency ranges are sent after network validation. No configuration or device ID is sent.</string>
     <string name="fn21_subscriptions">اشتراک‌ها</string>
+    <string name="fn21_open_nodes">فهرست گره‌ها</string>
     <string name="fn21_counts">%1$d گره · %2$d سالم · %3$d ناموفق · %4$d آزمایش‌نشده</string>
     <string name="fn21_free_fixed">غیرقابل حذف</string>
     <string name="fn21_back">بازگشت</string>

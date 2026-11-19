@@ -171,7 +171,8 @@ fun MainScreen(
                 SubscriptionListContent(
                     groups = groups,
                     mainViewModel = mainViewModel,
-                    selectedGroupId = uiState.selectedGroupId,
+                    selectedGroupId = uiState.selectedSubscriptionId,
+                    onSelect = { onAction(MainAction.SelectGroup(it)) },
                     onOpen = { searchQuery = ""; showSearch = false; onAction(MainAction.Search("")); onAction(MainAction.OpenSubscription(it)) },
                     onManage = { onNavigate(MainDestination.Subscriptions) },
                     onUpdate = { onAction(MainAction.UpdateGroupSubscription(it)) },

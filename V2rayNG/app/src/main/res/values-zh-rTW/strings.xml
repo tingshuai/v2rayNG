@@ -576,6 +576,7 @@
     <string name="free_node_feedback_title">傳送匿名探測回饋</string>
     <string name="free_node_feedback_summary">網路確認可用後，只傳送概略結果和延遲範圍，不傳送節點設定或裝置識別碼。</string>
     <string name="fn21_subscriptions">訂閱列表</string>
+    <string name="fn21_open_nodes">節點列表</string>
     <string name="fn21_counts">%1$d 個節點 · %2$d 個正常 · %3$d 個失敗 · %4$d 個未測試</string>
     <string name="fn21_free_fixed">不可刪除</string>
     <string name="fn21_back">返回</string>

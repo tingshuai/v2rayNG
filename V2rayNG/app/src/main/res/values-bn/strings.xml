@@ -578,6 +578,7 @@
     <string name="free_node_feedback_title">বেনামী পরীক্ষা প্রতিক্রিয়া পাঠান</string>
     <string name="free_node_feedback_summary">নেটওয়ার্ক যাচাই হলে শুধু সাধারণ ফলাফল ও বিলম্বের সীমা পাঠানো হয়। কনফিগারেশন বা ডিভাইস আইডি পাঠানো হয় না।</string>
     <string name="fn21_subscriptions">সাবস্ক্রিপশন</string>
+    <string name="fn21_open_nodes">নোড তালিকা</string>
     <string name="fn21_counts">%1$d নোড · %2$d সচল · %3$d ব্যর্থ · %4$d পরীক্ষিত নয়</string>
     <string name="fn21_free_fixed">মুছা যাবে না</string>
     <string name="fn21_back">ফিরে যান</string>

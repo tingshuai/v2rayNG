@@ -1,16 +1,5 @@
 # v2rayNG agent guide
 
-<!-- LOCAL INSTRUCTIONS - START: FreeV2ray autonomous continuation -->
-
-## Autonomous continuation
-
-- Once the user has supplied a plan or authorized implementation, continue through its in-scope steps in the same task. Do not end a turn after an intermediate implementation, a partial validation result, or a non-blocking environment failure and ask the user to restate the next step.
-- A missing build, test, formatting, or development tool is not a reason to stop work. First attempt a safe, standard installation appropriate to the current machine. If the agent cannot install it automatically, state the exact tool, supported installation command or source, and the specific user action required; continue every remaining in-scope task that does not depend on it.
-- Interrupt only for a material product decision the plan does not resolve, credentials or production access that only the user can provide, an irreversible external action outside the task's implied authority, or a required manual device/environment action that cannot be automated. State the precise blocker and resume automatically after the required input or state change.
-- Do not phrase unfinished work as a future promise such as “I will do the next step” and end the turn. Continue it. A turn may end only when the authorized scope is complete, a true blocker has been reported, or the user explicitly asks to pause.
-
-<!-- LOCAL INSTRUCTIONS - END: FreeV2ray autonomous continuation -->
-
 ## Scope and precedence
 
 This file applies to the entire repository. Read the applicable scoped guide before editing any
@@ -86,16 +75,18 @@ incompatible actions; every other root rule remains active.
 - Keep local-only text unstaged and uncommitted. Never use `git add .`, `git add -A`, or
   `git commit -a` in that worktree. Stage task paths explicitly; never delete, restore, or overwrite
   local instructions to clean the worktree.
-- Before each commit, push, or PR update outside agent-instruction scope, check the staged changes
-  and the changes introduced by the current task against the branch base. They must not include
-  instruction-file changes. Pre-existing instruction-file differences in branch history do not
-  block unrelated work; preserve them as local-only text and do not add new instruction-file
-  changes to a feature commit. For an agent-instruction task, stage only the explicitly targeted
-  instruction files and necessary routing-shim changes.
+- Before each commit, push, or PR update outside agent-instruction scope, run both commands. Both
+  must print no paths; otherwise stop and remove the instruction change from the staged or branch
+  diff without altering its working copy.
 
   ```sh
   git diff --cached --name-only -- ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' ':(glob)**/GEMINI.md' .github/copilot-instructions.md
+  git diff --name-only upstream/master...HEAD -- ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' ':(glob)**/GEMINI.md' .github/copilot-instructions.md
   ```
+
+- Commit instruction files only for a task explicitly limited to agent instructions. The branch
+  and PR may contain only `AGENTS.md` and necessary routing-shim changes; name agent instructions
+  in the PR title and state that exclusive scope in the body.
 
 ## Project boundaries
 
@@ -195,6 +186,17 @@ whitespace outside touched declarations or reorder imports except as the diff re
   issue requires it. Keep a stable path for supported non-preview devices, gate by runtime API or
   feature availability, and test both paths. After an API guard, opt-in, or lint suppression, run
   `:app:lintPlaystoreDebug` and also `:app:lintFdroidDebug` when behavior differs by distribution.
+
+<!-- LOCAL INSTRUCTIONS - START: FreeV2ray autonomous continuation -->
+
+## Autonomous continuation
+
+- Once the user has supplied a plan or authorized implementation, continue through its in-scope steps in the same task. Do not end a turn after an intermediate implementation, a partial validation result, or a non-blocking environment failure and ask the user to restate the next step.
+- A missing build, test, formatting, or development tool is not a reason to stop work. First attempt a safe, standard installation appropriate to the current machine. If the agent cannot install it automatically, state the exact tool, supported installation command or source, and the specific user action required; continue every remaining in-scope task that does not depend on it.
+- Interrupt only for a material product decision the plan does not resolve, credentials or production access that only the user can provide, an irreversible external action outside the task's implied authority, or a required manual device/environment action that cannot be automated. State the precise blocker and resume automatically after the required input or state change.
+- Do not phrase unfinished work as a future promise such as “I will do the next step” and end the turn. Continue it. A turn may end only when the authorized scope is complete, a true blocker has been reported, or the user explicitly asks to pause.
+
+<!-- LOCAL INSTRUCTIONS - END: FreeV2ray autonomous continuation -->
 
 <!-- LOCAL INSTRUCTIONS - START: FreeV2ray maintenance -->
 
