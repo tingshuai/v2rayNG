@@ -30,6 +30,7 @@ interface MainDataSource : Closeable {
 
     fun getServerGuidList(groupId: String): List<String>
     fun decodeServerConfig(guid: String): ProfileItem?
+    fun findPolicyGroupGuid(subscriptionId: String): String?
     fun decodeAffiliationInfo(guid: String): ServerAffiliationInfo?
 
     fun encodeServerList(guids: List<String>, groupId: String)

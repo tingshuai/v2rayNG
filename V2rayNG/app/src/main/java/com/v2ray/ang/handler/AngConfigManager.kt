@@ -657,10 +657,20 @@ object AngConfigManager {
         }
         val uri = URI(Utils.fixIllegalUrl(url))
         val subItem = SubscriptionItem()
-        subItem.remarks = uri.fragment ?: "import sub"
+        val requestedName = uri.fragment?.takeIf { it.isNotBlank() } ?: "手动导入"
+        val existingNames = subscriptions.map { it.subscription.remarks }.toSet()
+        subItem.remarks = generateUniqueSubscriptionName(requestedName, existingNames)
         subItem.url = url
         MmkvManager.encodeSubscription("", subItem)
         return 1
+    }
+
+    internal fun generateUniqueSubscriptionName(name: String, existingNames: Set<String>): String {
+        val baseName = name.trim().ifEmpty { "手动导入" }
+        if (baseName !in existingNames) return baseName
+        var suffix = 2
+        while ("$baseName $suffix" in existingNames) suffix++
+        return "$baseName $suffix"
     }
 
     /** Generates a description for the profile.

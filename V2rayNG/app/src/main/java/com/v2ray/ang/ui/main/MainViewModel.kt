@@ -14,6 +14,7 @@ import com.v2ray.ang.dto.TestServiceMessage
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.ServersCache
 import com.v2ray.ang.dto.entities.SubscriptionCache
+import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.delay
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.matchesPattern
@@ -89,6 +90,12 @@ private fun applyTestDelayResultsToRows(
         row.copy(testDelayMillis = delayMillis)
     }
 }
+
+internal fun shouldReplaceConnectionTarget(
+    current: ProfileItem?,
+    selectedSubscriptionId: String,
+): Boolean = current == null || current.configType != EConfigType.POLICYGROUP ||
+    current.policyGroupSubscriptionId != selectedSubscriptionId
 
 class MainViewModel(
     application: Application,
@@ -512,6 +519,12 @@ class MainViewModel(
                 }
                 val selectedGroup = resolveSelectedGroup(groups)
                 val viewedGroup = uiState.value.selectedGroupId.takeIf { id -> groups.any { it.id == id } } ?: selectedGroup
+                val selectedServerGuid = viewedGroup.takeIf { it.isNotBlank() }
+                    ?.let(dataSource::findPolicyGroupGuid)
+                    ?: dataSource.getSelectServer()
+                if (selectedServerGuid != null && selectedServerGuid != dataSource.getSelectServer()) {
+                    dataSource.setSelectServer(selectedServerGuid)
+                }
                 val validIds = groups.mapTo(HashSet()) { it.id }
                 groupUiFlows.keys.removeAll { it !in validIds }
                 groupServerFlows.keys.removeAll { it !in validIds }
@@ -522,7 +535,7 @@ class MainViewModel(
                         groups = groups,
                         selectedSubscriptionId = selectedGroup,
                         selectedGroupId = viewedGroup,
-                        selectedGuid = dataSource.getSelectServer(),
+                        selectedGuid = selectedServerGuid,
                     )
                 }
                 groups.forEach { mutableServerGroupState(it.id) }
@@ -770,11 +783,32 @@ class MainViewModel(
     fun subscriptionIdChanged(id: String) {
         if (_uiState.value.groups.none { it.id == id }) return
         mutableServerGroupState(id)
+        val isSelectingConnectionCollection = uiState.value.showingSubscriptions
         if (uiState.value.selectedGroupId != id || uiState.value.selectedSubscriptionId != id) {
             dataSource.setSelectedSubscriptionId(id)
             _uiState.update { it.withSelectedSubscription(id) }
         }
+        if (isSelectingConnectionCollection) {
+            ensurePolicyGroupSelection(id)
+        }
         loadSelectedGroup(id)
+    }
+
+    private fun ensurePolicyGroupSelection(subscriptionId: String) {
+        val selectedGuid = dataSource.getSelectServer() ?: return
+        val selected = dataSource.decodeServerConfig(selectedGuid)
+        if (selected == null) {
+            val groupGuid = dataSource.findPolicyGroupGuid(subscriptionId) ?: return
+            dataSource.setSelectServer(groupGuid)
+            _uiState.update { it.copy(selectedGuid = groupGuid) }
+            refreshSelectedServerInfo()
+            return
+        }
+        if (!shouldReplaceConnectionTarget(selected, subscriptionId)) return
+        val groupGuid = dataSource.findPolicyGroupGuid(subscriptionId) ?: return
+        dataSource.setSelectServer(groupGuid)
+        _uiState.update { it.copy(selectedGuid = groupGuid) }
+        refreshSelectedServerInfo()
     }
 
     private fun openSubscription(id: String) {

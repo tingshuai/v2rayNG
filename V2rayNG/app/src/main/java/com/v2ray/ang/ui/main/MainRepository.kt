@@ -16,6 +16,7 @@ import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.ServerAffiliationInfo
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
+import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.serializable
 import com.v2ray.ang.handler.AngConfigManager
 import com.v2ray.ang.handler.AppLocaleManager
@@ -156,6 +157,14 @@ class MainRepository(
 
     override fun decodeServerConfig(guid: String): ProfileItem? =
         MmkvManager.decodeServerConfig(guid)
+
+    override fun findPolicyGroupGuid(subscriptionId: String): String? =
+        MmkvManager.decodeAllServerList().firstOrNull { guid ->
+            MmkvManager.decodeServerConfig(guid)?.let { profile ->
+                profile.configType == EConfigType.POLICYGROUP &&
+                    profile.policyGroupSubscriptionId == subscriptionId
+            } == true
+        }
 
     override fun decodeAffiliationInfo(guid: String): ServerAffiliationInfo? =
         MmkvManager.decodeServerAffiliationInfo(guid)

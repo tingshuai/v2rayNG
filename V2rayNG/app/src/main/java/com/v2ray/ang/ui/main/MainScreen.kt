@@ -116,6 +116,7 @@ fun MainScreen(
                 MainTopBar(
                     title = if (uiState.showingSubscriptions) stringResource(R.string.fn21_subscriptions)
                     else if (uiState.selectedGroupId == AppConfig.DEFAULT_SUBSCRIPTION_ID) stringResource(R.string.fn21_manual_import)
+                    else if (uiState.selectedGroupId == AppConfig.FREE_NODE_SUBSCRIPTION_ID) stringResource(R.string.free_node_subscription_name)
                     else groups.firstOrNull { it.id == uiState.selectedGroupId }?.remarks.orEmpty(),
                     showBack = !uiState.showingSubscriptions,
                     onBackClick = {

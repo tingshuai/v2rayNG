@@ -190,7 +190,17 @@ class MainActivity : HelperBaseComponentActivity() {
     }
 
     private fun startV2Ray() {
-        if (mainViewModel.uiState.value.selectedGuid.isNullOrEmpty()) {
+        val state = mainViewModel.uiState.value
+        val selectedGroupId = state.selectedSubscriptionId
+        val hasUsableTarget = if (selectedGroupId.isNotBlank()) {
+            MmkvManager.decodeAllServerList().any { id ->
+                MmkvManager.decodeServerConfig(id)?.let { profile ->
+                    profile.configType == EConfigType.POLICYGROUP &&
+                        profile.policyGroupSubscriptionId == selectedGroupId
+                } == true
+            } || MmkvManager.decodeServerList(selectedGroupId).isNotEmpty()
+        } else !state.selectedGuid.isNullOrEmpty()
+        if (!hasUsableTarget) {
             toast(R.string.title_file_chooser)
             return
         }

@@ -8,6 +8,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.toast
+import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
@@ -41,6 +42,24 @@ object LauncherManager {
 
         if (guid != null) {
             MmkvManager.setSelectServer(guid)
+        }
+
+        // A selected subscription is represented by its policy-group profile; its balancer
+        // owns member choice and runtime failure handling for the whole collection.
+        val selectedGroupId = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID).orEmpty()
+        val selectedProfile = MmkvManager.getSelectServer()?.let(MmkvManager::decodeServerConfig)
+        if (selectedGroupId.isNotBlank() && selectedProfile?.let {
+                it.configType != EConfigType.POLICYGROUP || it.policyGroupSubscriptionId != selectedGroupId
+            } != false
+        ) {
+            val groupProfileId = MmkvManager.decodeAllServerList()
+                .firstOrNull { id ->
+                    MmkvManager.decodeServerConfig(id)?.let { profile ->
+                        profile.configType == EConfigType.POLICYGROUP &&
+                            profile.policyGroupSubscriptionId == selectedGroupId
+                    } == true
+                }
+            if (groupProfileId != null) MmkvManager.setSelectServer(groupProfileId)
         }
 
         try {

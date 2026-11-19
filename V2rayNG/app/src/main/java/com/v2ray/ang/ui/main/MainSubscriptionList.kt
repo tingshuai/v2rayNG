@@ -79,7 +79,11 @@ internal fun SubscriptionListContent(
             val state by flow.collectAsStateWithLifecycle()
             val counts = subscriptionCounts(state)
             val isFree = group.id == AppConfig.FREE_NODE_SUBSCRIPTION_ID
-            val title = if (group.id == AppConfig.DEFAULT_SUBSCRIPTION_ID) stringResource(R.string.fn21_manual_import) else group.remarks
+            val title = when (group.id) {
+                AppConfig.DEFAULT_SUBSCRIPTION_ID -> stringResource(R.string.fn21_manual_import)
+                AppConfig.FREE_NODE_SUBSCRIPTION_ID -> stringResource(R.string.free_node_subscription_name)
+                else -> group.remarks
+            }
             val isSelected = group.id == selectedGroupId
             val label = stringResource(R.string.fn21_subscription_summary, title, counts.total, counts.healthy, counts.failed, counts.untested)
             Card(

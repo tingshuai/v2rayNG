@@ -198,6 +198,14 @@ whitespace outside touched declarations or reorder imports except as the diff re
 
 <!-- LOCAL INSTRUCTIONS - END: FreeV2ray autonomous continuation -->
 
+<!-- LOCAL INSTRUCTIONS - START: Connected Android test device -->
+
+## Connected Android test device
+
+- During Android development and validation, automatically use the user's connected test phone when `adb devices` lists an authorized device. The user has enabled developer options, app installation, and simulated-click permission on that phone. If no authorized phone is connected, continue all checks that do not require one and then tell the user the exact missing device action. Set Android SDK/cache paths for agent build downloads to `D:\CodexData\CodexDownloads` when the SDK toolchain is not already installed.
+
+<!-- LOCAL INSTRUCTIONS - END: Connected Android test device -->
+
 <!-- LOCAL INSTRUCTIONS - START: FreeV2ray maintenance -->
 
 ## FreeV2ray maintenance scope

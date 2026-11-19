@@ -6,6 +6,7 @@ import com.v2ray.ang.AppConfig
 import com.v2ray.ang.R
 import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.SubscriptionItem
+import com.v2ray.ang.enums.BalancerStrategyType
 import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.util.JsonUtil
 import java.security.SecureRandom
@@ -134,6 +135,7 @@ object FreeNodeManager {
             remarks = context.getString(R.string.free_node_policy_group_name)
             policyGroupSubscriptionId = AppConfig.FREE_NODE_SUBSCRIPTION_ID
             policyGroupTestOutbounds = true
+            policyGroupType = BalancerStrategyType.LEAST_PING.policyGroupTypeValue
         }
         val id = MmkvManager.encodeServerConfig("", profile)
         MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_POLICY_GROUP_ID, id)
