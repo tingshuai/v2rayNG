@@ -15,6 +15,12 @@ import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
 
+internal fun includePolicyGroupMember(
+    isFreeNodeGroup: Boolean,
+    isInternalAutoGroup: Boolean,
+    testDelayMillis: Long?,
+): Boolean = isFreeNodeGroup || !isInternalAutoGroup || (testDelayMillis ?: 0L) > 0L
+
 /**
  * Build runtime context from the selected profile.
  *
@@ -146,6 +152,7 @@ object CoreConfigContextBuilder {
         try {
             val serverList = MmkvManager.decodeAllServerList()
             val isFreeNodeGroup = config.policyGroupSubscriptionId == AppConfig.FREE_NODE_SUBSCRIPTION_ID
+            val isInternalAutoGroup = config.policyGroupAutoSelection == true || isFreeNodeGroup
             val selectableFreeNodeFingerprints = if (isFreeNodeGroup) FreeNodeManager.selectableFingerprints() else emptySet()
             val members = serverList
                 .asSequence()
@@ -172,6 +179,13 @@ object CoreConfigContextBuilder {
                 }
                 .filter { (_, profile) ->
                     !isFreeNodeGroup || FreeNodeManager.fingerprint(profile) in selectableFreeNodeFingerprints
+                }
+                .filter { (guid, _) ->
+                    includePolicyGroupMember(
+                        isFreeNodeGroup = isFreeNodeGroup,
+                        isInternalAutoGroup = isInternalAutoGroup,
+                        testDelayMillis = MmkvManager.decodeServerAffiliationInfo(guid)?.testDelayMillis,
+                    )
                 }
                 .filter { (_, profile) -> profile.server.isNotNullEmpty() }
                 .filter { (_, profile) -> Utils.isPureIpAddress(profile.server!!) || Utils.isValidUrl(profile.server!!) }

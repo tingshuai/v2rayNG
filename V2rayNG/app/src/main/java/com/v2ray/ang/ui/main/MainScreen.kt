@@ -39,6 +39,7 @@ fun MainScreen(
     val bottomDisplayText = if (!uiState.showingSubscriptions && uiState.isTesting) {
         mainViewModel.formatStatus(if (isRunning) MainStatus.Connected else MainStatus.Disconnected)
     } else displayText
+    val displayLastConnectionTest = uiState.lastConnectionTest
     val selectedGuid = uiState.selectedGuid
     val confirmRemove = uiState.confirmRemove
     val shareQRCodeBitmap = uiState.shareQRCodeBitmap
@@ -162,6 +163,7 @@ fun MainScreen(
                     displayText = bottomDisplayText,
                     selectedServerLabel = uiState.selectedServerLabel,
                     selectedServerDelayMillis = uiState.selectedServerDelayMillis,
+                    connectionTestLabel = displayLastConnectionTest?.let(mainViewModel::formatConnectionTestResult),
                     connectionGroupLabel = when (uiState.selectedSubscriptionId) {
                         AppConfig.FREE_NODE_SUBSCRIPTION_ID -> stringResource(R.string.free_node_subscription_name)
                         AppConfig.DEFAULT_SUBSCRIPTION_ID -> stringResource(R.string.fn21_manual_import)

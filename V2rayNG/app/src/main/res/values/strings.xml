@@ -574,6 +574,7 @@
     <string name="free_node_enable_confirm">I understand and enable</string>
     <string name="free_node_enable_failed">Unable to enable free nodes.</string>
     <string name="free_node_no_healthy_candidates">No locally verified free-node candidates are available. Run a speed test or try again later.</string>
+    <string name="subscription_auto_no_healthy_candidates">No locally verified nodes are available in this subscription. Run a speed test or try again later.</string>
     <string name="free_node_subscription_name">Free-node candidates</string>
     <string name="free_node_policy_group_name">Free-node automatic selection</string>
     <string name="free_node_feedback_title">Share anonymous probe feedback</string>

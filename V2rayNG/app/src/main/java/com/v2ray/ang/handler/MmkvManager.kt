@@ -12,6 +12,7 @@ import com.tencent.mmkv.MMKV
 import com.tencent.mmkv.MMKVHandler
 import com.tencent.mmkv.MMKVLogLevel
 import com.tencent.mmkv.MMKVRecoverStrategic
+import com.v2ray.ang.AppConfig
 import com.v2ray.ang.AppConfig.DEFAULT_SUBSCRIPTION_ID
 import com.v2ray.ang.AppConfig.PREF_IS_BOOTED
 import com.v2ray.ang.AppConfig.PREF_ROUTING_RULESET
@@ -26,6 +27,7 @@ import com.v2ray.ang.dto.entities.ServerAffiliationInfo
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
 import com.v2ray.ang.dto.entities.WebDavConfig
+import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.util.JsonUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.flow.collectLatest
@@ -258,6 +260,11 @@ object MmkvManager {
         if (guid.isBlank()) {
             return null
         }
+        if (guid == AppConfig.SUBSCRIPTION_AUTO_SELECTION_PROFILE_GUID) {
+            val internalProfile = decodeSettingsString(AppConfig.PREF_SUBSCRIPTION_AUTO_SELECTION_PROFILE)
+                ?: return null
+            return JsonUtil.fromJsonSafe(internalProfile, ProfileItem::class.java)
+        }
         val json = profileFullStorage.decodeString(guid)
         if (json.isNullOrBlank()) {
             return null
@@ -274,6 +281,16 @@ object MmkvManager {
      * @return The server GUID.
      */
     fun encodeServerConfig(guid: String, config: ProfileItem): String {
+        if (guid == AppConfig.SUBSCRIPTION_AUTO_SELECTION_PROFILE_GUID) {
+            require(config.configType == EConfigType.POLICYGROUP && config.policyGroupAutoSelection == true) {
+                "Internal subscription auto-selection profile must be a managed policy group"
+            }
+            requireStorageWrite(
+                encodeSettings(AppConfig.PREF_SUBSCRIPTION_AUTO_SELECTION_PROFILE, JsonUtil.toJson(config)),
+                "Failed to save internal subscription auto-selection profile",
+            )
+            return guid
+        }
         val key = guid.ifBlank { Utils.getUuid() }
         withProfileIndexLock {
             requireStorageWrite(
@@ -397,6 +414,14 @@ object MmkvManager {
      */
     fun removeServer(guid: String) {
         if (guid.isBlank()) {
+            return
+        }
+        if (guid == AppConfig.SUBSCRIPTION_AUTO_SELECTION_PROFILE_GUID) {
+            requireStorageWrite(
+                encodeSettings(AppConfig.PREF_SUBSCRIPTION_AUTO_SELECTION_PROFILE, null),
+                "Failed to remove internal subscription auto-selection profile",
+            )
+            if (getSelectServer() == guid) clearSelectServer()
             return
         }
 

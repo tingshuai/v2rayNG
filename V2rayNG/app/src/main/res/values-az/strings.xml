@@ -574,6 +574,7 @@
     <string name="free_node_enable_confirm">Başa düşürəm və aktivləşdirirəm</string>
     <string name="free_node_enable_failed">Pulsuz qovşaqları aktivləşdirmək mümkün olmadı.</string>
     <string name="free_node_no_healthy_candidates">Yerli olaraq yoxlanmış pulsuz qovşaqlar yoxdur. Sürət testini başladın və ya sonra yenidən cəhd edin.</string>
+    <string name="subscription_auto_no_healthy_candidates">Bu abunəlikdə yerli olaraq yoxlanmış qovşaq yoxdur. Sürət testini başladın və ya sonra yenidən cəhd edin.</string>
     <string name="free_node_subscription_name">Pulsuz qovşaq namizədləri</string>
     <string name="free_node_policy_group_name">Pulsuz qovşağın avtomatik seçimi</string>
     <string name="free_node_feedback_title">Anonim yoxlama rəyi göndər</string>

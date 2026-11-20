@@ -130,12 +130,19 @@ object FreeNodeManager {
 
     private fun ensurePolicyGroup(context: Context) {
         val storedId = MmkvManager.decodeSettingsString(AppConfig.PREF_FREE_NODE_POLICY_GROUP_ID).orEmpty()
-        if (storedId.isNotEmpty() && MmkvManager.decodeServerConfig(storedId)?.policyGroupSubscriptionId == AppConfig.FREE_NODE_SUBSCRIPTION_ID) return
+        val storedProfile = storedId.takeIf { it.isNotEmpty() }?.let(MmkvManager::decodeServerConfig)
+        if (storedProfile?.policyGroupSubscriptionId == AppConfig.FREE_NODE_SUBSCRIPTION_ID) {
+            if (storedProfile.policyGroupAutoSelection != true) {
+                MmkvManager.encodeServerConfig(storedId, storedProfile.copy(policyGroupAutoSelection = true))
+            }
+            return
+        }
         val profile = ProfileItem.create(EConfigType.POLICYGROUP).apply {
             remarks = context.getString(R.string.free_node_policy_group_name)
             policyGroupSubscriptionId = AppConfig.FREE_NODE_SUBSCRIPTION_ID
             policyGroupTestOutbounds = true
             policyGroupType = BalancerStrategyType.LEAST_PING.policyGroupTypeValue
+            policyGroupAutoSelection = true
         }
         val id = MmkvManager.encodeServerConfig("", profile)
         MmkvManager.encodeSettings(AppConfig.PREF_FREE_NODE_POLICY_GROUP_ID, id)

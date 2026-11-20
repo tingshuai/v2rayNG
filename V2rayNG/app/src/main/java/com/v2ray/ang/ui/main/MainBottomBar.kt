@@ -43,6 +43,7 @@ fun MainBottomBar(
     displayText: String,
     selectedServerLabel: String?,
     selectedServerDelayMillis: Long,
+    connectionTestLabel: String?,
     connectionGroupLabel: String,
     connectionSource: ConnectionSource,
     status: MainStatus,
@@ -114,7 +115,7 @@ fun MainBottomBar(
                         }
                     }
                     Text(
-                        text = if (selectedServerDelayMillis > 0L) {
+                        text = connectionTestLabel ?: if (selectedServerDelayMillis > 0L) {
                             stringResource(R.string.fn21_bottom_status, displayText, selectedServerDelayMillis)
                         } else displayText,
                         style = MaterialTheme.typography.bodySmall,

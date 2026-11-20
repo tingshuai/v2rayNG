@@ -27,6 +27,7 @@ data class MainUiState(
     val isRunning: Boolean = false,
     val isTesting: Boolean = false,
     val status: MainStatus = MainStatus.Disconnected,
+    val lastConnectionTest: ConnectionTestResult? = null,
     val connectionSource: ConnectionSource = ConnectionSource.DIRECT_SERVER,
     val locateTarget: LocateTarget? = null,
     val confirmRemove: Boolean = false,

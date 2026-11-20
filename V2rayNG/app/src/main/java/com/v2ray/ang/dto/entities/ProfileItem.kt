@@ -71,6 +71,7 @@ data class ProfileItem(
     var policyGroupFilter: String? = null,
     var policyGroupTestOutbounds: Boolean? = null,
     var policyGroupFallbackTag: String? = null,
+    var policyGroupAutoSelection: Boolean? = null,
     var proxyChainProfiles: String? = null,
 
     var browserDialerMode: String? = null,

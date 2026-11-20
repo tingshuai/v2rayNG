@@ -12,6 +12,7 @@ import com.v2ray.ang.enums.EConfigType
 import com.v2ray.ang.extension.toastError
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
+import com.v2ray.ang.handler.SubscriptionAutoSelectionManager
 import com.v2ray.ang.helper.MessageHelper
 import com.v2ray.ang.root.RootManager
 import com.v2ray.ang.service.CoreProxyOnlyService
@@ -19,6 +20,15 @@ import com.v2ray.ang.service.CoreRootService
 import com.v2ray.ang.service.CoreVpnService
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
+
+internal fun shouldResolveSubscriptionGroupAtStart(
+    explicitGuid: String?,
+    selectedProfile: com.v2ray.ang.dto.entities.ProfileItem?,
+    selectedGroupId: String,
+): Boolean = explicitGuid == null && selectedGroupId.isNotBlank() &&
+    (selectedProfile == null ||
+        (selectedProfile.configType == EConfigType.POLICYGROUP &&
+            selectedProfile.policyGroupSubscriptionId != selectedGroupId))
 
 object LauncherManager {
 
@@ -48,10 +58,7 @@ object LauncherManager {
         // owns member choice and runtime failure handling for the whole collection.
         val selectedGroupId = MmkvManager.decodeSettingsString(AppConfig.CACHE_SUBSCRIPTION_ID).orEmpty()
         val selectedProfile = MmkvManager.getSelectServer()?.let(MmkvManager::decodeServerConfig)
-        if (selectedGroupId.isNotBlank() && selectedProfile?.let {
-                it.configType != EConfigType.POLICYGROUP || it.policyGroupSubscriptionId != selectedGroupId
-            } != false
-        ) {
+        if (shouldResolveSubscriptionGroupAtStart(guid, selectedProfile, selectedGroupId)) {
             val groupProfileId = MmkvManager.decodeAllServerList()
                 .firstOrNull { id ->
                     MmkvManager.decodeServerConfig(id)?.let { profile ->
@@ -59,6 +66,7 @@ object LauncherManager {
                             profile.policyGroupSubscriptionId == selectedGroupId
                     } == true
                 }
+                ?: SubscriptionAutoSelectionManager.ensurePolicyGroup(selectedGroupId)
             if (groupProfileId != null) MmkvManager.setSelectServer(groupProfileId)
         }
 

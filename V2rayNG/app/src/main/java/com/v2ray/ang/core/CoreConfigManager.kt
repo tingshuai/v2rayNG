@@ -54,6 +54,19 @@ object CoreConfigManager {
                     errorMessage = context.getString(R.string.free_node_no_healthy_candidates),
                 )
             }
+            val isInternalAutoGroup = primary?.resolvedType == CoreResolvedType.POLICYGROUP &&
+                (primary.profile.policyGroupAutoSelection == true || isFreeNodeGroup)
+            if (isMissingRequiredAutomaticPolicyGroupBalancer(
+                    isInternalAutoGroup && !isFreeNodeGroup,
+                    config.routing.balancers.orEmpty().map { it.tag }.toSet(),
+                )
+            ) {
+                return ConfigResult(
+                    status = false,
+                    guid = guid,
+                    errorMessage = context.getString(R.string.subscription_auto_no_healthy_candidates),
+                )
+            }
             return toConfigResult(configContext, config)
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to get V2ray config", e)
@@ -67,6 +80,9 @@ object CoreConfigManager {
 
     internal fun isMissingRequiredFreeNodeBalancer(isFreeNodeGroup: Boolean, balancerTags: Set<String>): Boolean =
         isFreeNodeGroup && AppConfig.TAG_BALANCER !in balancerTags
+
+    internal fun isMissingRequiredAutomaticPolicyGroupBalancer(isAutomaticGroup: Boolean, balancerTags: Set<String>): Boolean =
+        isAutomaticGroup && AppConfig.TAG_BALANCER !in balancerTags
 
     /**
      * Build a lightweight configuration for latency testing.

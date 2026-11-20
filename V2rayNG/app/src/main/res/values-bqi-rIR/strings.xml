@@ -573,6 +573,7 @@
     <string name="free_node_enable_confirm">می‌دانم و فعال می‌کنم</string>
     <string name="free_node_enable_failed">فعال‌سازی گره‌های رایگان انجام نشد.</string>
     <string name="free_node_no_healthy_candidates">هیچ گره رایگان تأییدشده‌ای در دستگاه نیست. آزمون سرعت را اجرا کنید یا بعداً دوباره تلاش کنید.</string>
+    <string name="subscription_auto_no_healthy_candidates">هیچ گره تأییدشده‌ای در این اشتراک وجود ندارد. آزمون سرعت را اجرا کنید یا بعداً دوباره تلاش کنید.</string>
     <string name="free_node_subscription_name">نامزدهای گرهٔ رایگان</string>
     <string name="free_node_policy_group_name">انتخاب خودکار گرهٔ رایگان</string>
     <string name="free_node_feedback_title">Anonymous probe feedback</string>

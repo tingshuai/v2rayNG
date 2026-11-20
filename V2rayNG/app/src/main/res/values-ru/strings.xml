@@ -577,6 +577,7 @@
     <string name="free_node_enable_confirm">Я понимаю и включаю</string>
     <string name="free_node_enable_failed">Не удалось включить бесплатные узлы.</string>
     <string name="free_node_no_healthy_candidates">Нет локально проверенных бесплатных узлов. Запустите проверку скорости или попробуйте позже.</string>
+    <string name="subscription_auto_no_healthy_candidates">В этой подписке нет локально проверенных узлов. Запустите проверку скорости или попробуйте позже.</string>
     <string name="free_node_subscription_name">Кандидаты бесплатных узлов</string>
     <string name="free_node_policy_group_name">Автовыбор бесплатных узлов</string>
     <string name="free_node_feedback_title">Отправлять анонимные данные проверки</string>

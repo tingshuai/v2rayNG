@@ -573,6 +573,7 @@
     <string name="free_node_enable_confirm">আমি বুঝি এবং চালু করি</string>
     <string name="free_node_enable_failed">বিনামূল্যের নোড চালু করা যায়নি।</string>
     <string name="free_node_no_healthy_candidates">স্থানীয়ভাবে যাচাই করা কোনো ফ্রি নোড নেই। স্পিড টেস্ট চালান বা পরে আবার চেষ্টা করুন।</string>
+    <string name="subscription_auto_no_healthy_candidates">এই সাবস্ক্রিপশনে স্থানীয়ভাবে যাচাই করা কোনো নোড নেই। স্পিড টেস্ট চালান বা পরে আবার চেষ্টা করুন।</string>
     <string name="free_node_subscription_name">বিনামূল্যের নোড প্রার্থী</string>
     <string name="free_node_policy_group_name">বিনামূল্যের নোড স্বয়ংক্রিয় নির্বাচন</string>
     <string name="free_node_feedback_title">বেনামী পরীক্ষা প্রতিক্রিয়া পাঠান</string>

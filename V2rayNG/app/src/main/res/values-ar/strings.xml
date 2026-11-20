@@ -581,6 +581,7 @@
     <string name="free_node_enable_confirm">أفهم وأفعّل</string>
     <string name="free_node_enable_failed">تعذر تفعيل العُقد المجانية.</string>
     <string name="free_node_no_healthy_candidates">لا توجد عُقد مجانية تم التحقق منها محليًا. اختبر السرعة أو حاول مرة أخرى لاحقًا.</string>
+    <string name="subscription_auto_no_healthy_candidates">لا توجد عُقد تم التحقق منها محليًا في هذا الاشتراك. اختبر السرعة أو حاول مرة أخرى لاحقًا.</string>
     <string name="free_node_subscription_name">مرشحو العُقد المجانية</string>
     <string name="free_node_policy_group_name">اختيار العُقد المجانية تلقائياً</string>
     <string name="free_node_feedback_title">إرسال ملاحظات اختبار مجهولة</string>

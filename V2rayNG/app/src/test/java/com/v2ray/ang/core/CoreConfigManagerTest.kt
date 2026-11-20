@@ -12,4 +12,20 @@ class CoreConfigManagerTest {
         assertFalse(CoreConfigManager.isMissingRequiredFreeNodeBalancer(false, emptySet()))
         assertFalse(CoreConfigManager.isMissingRequiredFreeNodeBalancer(true, setOf(AppConfig.TAG_BALANCER)))
     }
+
+    @Test
+    fun rejectsAutomaticSubscriptionGroupsWithoutVerifiedMembers() {
+        assertTrue(CoreConfigManager.isMissingRequiredAutomaticPolicyGroupBalancer(true, emptySet()))
+        assertFalse(CoreConfigManager.isMissingRequiredAutomaticPolicyGroupBalancer(false, emptySet()))
+        assertFalse(CoreConfigManager.isMissingRequiredAutomaticPolicyGroupBalancer(true, setOf(AppConfig.TAG_BALANCER)))
+    }
+
+    @Test
+    fun automaticSubscriptionGroupIncludesOnlyLocallyPassingMembers() {
+        assertTrue(includePolicyGroupMember(false, true, 42L))
+        assertFalse(includePolicyGroupMember(false, true, -1L))
+        assertFalse(includePolicyGroupMember(false, true, null))
+        assertTrue(includePolicyGroupMember(true, true, -1L))
+        assertTrue(includePolicyGroupMember(false, false, null))
+    }
 }

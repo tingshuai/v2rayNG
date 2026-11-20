@@ -571,6 +571,7 @@
     <string name="free_node_enable_confirm">Tôi hiểu và bật</string>
     <string name="free_node_enable_failed">Không thể bật nút miễn phí.</string>
     <string name="free_node_no_healthy_candidates">Chưa có nút miễn phí nào được kiểm tra trên thiết bị. Hãy chạy kiểm tra tốc độ hoặc thử lại sau.</string>
+    <string name="subscription_auto_no_healthy_candidates">Chưa có nút nào trong gói đăng ký được kiểm tra trên thiết bị. Hãy chạy kiểm tra tốc độ hoặc thử lại sau.</string>
     <string name="free_node_subscription_name">Ứng viên nút miễn phí</string>
     <string name="free_node_policy_group_name">Chọn tự động nút miễn phí</string>
     <string name="free_node_feedback_title">Gửi phản hồi kiểm tra ẩn danh</string>

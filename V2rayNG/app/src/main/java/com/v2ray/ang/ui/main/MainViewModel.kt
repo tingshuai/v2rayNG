@@ -20,6 +20,7 @@ import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.matchesPattern
 import com.v2ray.ang.extension.moveItem
 import com.v2ray.ang.handler.SubscriptionInfoParser
+import com.v2ray.ang.handler.SubscriptionAutoSelectionManager
 import com.v2ray.ang.ui.base.BaseViewModel
 import com.v2ray.ang.util.LogUtil
 import kotlinx.coroutines.CancellationException
@@ -189,7 +190,13 @@ class MainViewModel(
             MainServiceEvent.StateStopSuccess -> updateRunningState(false)
             is MainServiceEvent.MeasureDelayResult -> {
                 if (!uiState.value.isRunning || !testRequests.completeCurrent(event.requestId)) return
-                _uiState.update { it.copy(isTesting = testRequests.isTesting, status = connectionTestStatus(event.result)) }
+                _uiState.update {
+                    it.copy(
+                        isTesting = testRequests.isTesting,
+                        status = connectionTestStatus(event.result),
+                        lastConnectionTest = event.result,
+                    )
+                }
             }
 
             is MainServiceEvent.MeasureConfigSuccess -> {
@@ -287,7 +294,7 @@ class MainViewModel(
         is MainStatus.ConnectionTest -> formatConnectionTestResult(status.result)
     }
 
-    private fun formatConnectionTestResult(result: ConnectionTestResult): String {
+    internal fun formatConnectionTestResult(result: ConnectionTestResult): String {
         val status = if (result.delayMillis >= 0) {
             val delay = dataSource.getString(R.string.server_test_delay_value, result.delayMillis)
             dataSource.getString(R.string.connection_test_available, delay)
@@ -408,6 +415,7 @@ class MainViewModel(
         guids.mapNotNull { guid ->
             currentCoroutineContext().ensureActive()
             val profile = dataSource.decodeServerConfig(guid) ?: return@mapNotNull null
+            if (SubscriptionAutoSelectionManager.isInternalPolicyGroup(guid, profile)) return@mapNotNull null
             val affiliation = dataSource.decodeAffiliationInfo(guid)
             ServersCache(
                 guid = guid,
@@ -823,6 +831,7 @@ class MainViewModel(
                     it.copy(
                         selectedServerDelayMillis = 0L,
                         status = if (it.isRunning) MainStatus.Testing else MainStatus.Disconnected,
+                        lastConnectionTest = null,
                     )
                 }
                 if (_uiState.value.isRunning) testCurrentServerRealPing()
@@ -832,38 +841,22 @@ class MainViewModel(
     }
 
     private fun ensurePolicyGroupSelection(subscriptionId: String) {
-        val selectedGuid = dataSource.getSelectServer() ?: return
-        val selected = dataSource.decodeServerConfig(selectedGuid)
-        if (selected == null) {
-            val groupGuid = dataSource.findPolicyGroupGuid(subscriptionId)
-            LogUtil.diagnostic(
-                "policy_group_resolution",
-                mapOf(
-                    "subscription" to LogUtil.diagnosticId(subscriptionId),
-                    "current_profile" to LogUtil.diagnosticId(selectedGuid),
-                    "current_subscription" to "none",
-                    "target_group_profile" to LogUtil.diagnosticId(groupGuid),
-                    "found" to (groupGuid != null).toString(),
-                ),
-            )
-            if (groupGuid == null) return
-            dataSource.setSelectServer(groupGuid)
-            _uiState.update { it.copy(selectedGuid = groupGuid) }
-            refreshSelectedServerInfo()
-            return
-        }
+        val selectedGuid = dataSource.getSelectServer()
+        val selected = selectedGuid?.let(dataSource::decodeServerConfig)
         if (!shouldReplaceConnectionTarget(selected, subscriptionId)) return
-        val groupGuid = dataSource.findPolicyGroupGuid(subscriptionId)
+        val existingGroupGuid = dataSource.findPolicyGroupGuid(subscriptionId)
+        val groupGuid = existingGroupGuid ?: SubscriptionAutoSelectionManager.ensurePolicyGroup(subscriptionId)
         LogUtil.diagnostic(
             "policy_group_resolution",
             mapOf(
                 "subscription" to LogUtil.diagnosticId(subscriptionId),
                 "current_profile" to LogUtil.diagnosticId(selectedGuid),
                 "current_subscription" to LogUtil.diagnosticId(
-                    selected.policyGroupSubscriptionId ?: selected.subscriptionId
+                    selected?.policyGroupSubscriptionId ?: selected?.subscriptionId
                 ),
                 "target_group_profile" to LogUtil.diagnosticId(groupGuid),
                 "found" to (groupGuid != null).toString(),
+                "source" to if (existingGroupGuid != null) "existing" else "automatic",
             ),
         )
         if (groupGuid == null) return

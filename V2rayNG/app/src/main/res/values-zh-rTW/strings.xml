@@ -571,6 +571,7 @@
     <string name="free_node_enable_confirm">我已了解並啟用</string>
     <string name="free_node_enable_failed">無法啟用免費節點。</string>
     <string name="free_node_no_healthy_candidates">沒有通過本機驗證的免費節點。請先執行測速或稍後再試。</string>
+    <string name="subscription_auto_no_healthy_candidates">此訂閱沒有通過本機驗證的節點。請先執行測速或稍後再試。</string>
     <string name="free_node_subscription_name">免費節點候選</string>
     <string name="free_node_policy_group_name">免費節點自動選擇</string>
     <string name="free_node_feedback_title">傳送匿名探測回饋</string>

@@ -19,6 +19,8 @@ object AppConfig {
     // Default subscription ID for ungrouped servers
     const val DEFAULT_SUBSCRIPTION_ID = "__default_subscription__"
     const val FREE_NODE_SUBSCRIPTION_ID = "__free_node_subscription_v1__"
+    const val SUBSCRIPTION_AUTO_SELECTION_PROFILE_GUID = "__subscription_auto_selection_profile__"
+    const val PREF_SUBSCRIPTION_AUTO_SELECTION_PROFILE = "pref_subscription_auto_selection_profile"
     const val FREE_NODE_SUBSCRIPTION_URL = "https://freenode.go2base.com/manifest"
 
     /** Preferences mapped to MMKV storage. */
