@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -125,7 +126,12 @@ internal fun SubscriptionListContent(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { onOpen(group.id) }) {
                             Text(stringResource(R.string.fn21_open_nodes))
-                            Text("  ›", color = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                painterResource(R.drawable.ic_arrow_back_24dp),
+                                contentDescription = null,
+                                modifier = Modifier.padding(start = 4.dp).size(24.dp).rotate(180f),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
                         }
                     }
                 }

@@ -47,6 +47,15 @@ internal fun MainUiState.withOpenedSubscription(groupId: String): MainUiState =
 internal fun connectionTestStatus(result: ConnectionTestResult): MainStatus =
     if (result.delayMillis < 0L) MainStatus.Connected else MainStatus.ConnectionTest(result)
 
+internal fun testProgressPercent(progress: String?): Int? {
+    val parts = progress?.split('/') ?: return null
+    if (parts.size != 2) return null
+    val completed = parts[0].trim().toIntOrNull() ?: return null
+    val total = parts[1].trim().toIntOrNull()?.takeIf { it > 0 } ?: return null
+    val boundedCompleted = completed.coerceIn(0, total)
+    return ((boundedCompleted.toLong() * 100 + total / 2) / total).toInt()
+}
+
 /**
  * All possible user interaction intents
  */

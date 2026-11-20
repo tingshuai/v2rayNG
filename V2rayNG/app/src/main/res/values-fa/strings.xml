@@ -408,7 +408,7 @@
     <string name="connection_test_error_status_code">کد خطا: #%d</string>
     <string name="connection_connected">متصل است.\nبرای بررسی اتصال ضربه بزنید.</string>
     <string name="connection_not_connected">متصل نیست</string>
-    <string name="connection_running_task_left">آزمایش‌های در حال اجرا: %s</string>
+    <string name="connection_running_task_left">پیشرفت آزمایش: %s</string>
 
     <string name="import_subscription_success">اشتراک با موفقیت وارد شد</string>
     <string name="import_subscription_failure">وارد کردن اشتراک ناموفق بود</string>
@@ -598,4 +598,5 @@
     <string name="fn21_manual_subtitle">گره‌های محلی · بدون به‌روزرسانی خودکار</string>
     <string name="fn22_auto_tag">خودکار</string>
     <string name="fn22_manual_tag">دستی</string>
+    <string name="fn23_testing_progress">آزمایش در حال انجام: %1$d%%</string>
 </resources>

@@ -408,7 +408,7 @@
     <string name="connection_test_error_status_code">Error code: #%d</string>
     <string name="connection_connected">Connected. Tap to check connection.</string>
     <string name="connection_not_connected">Not connected</string>
-    <string name="connection_running_task_left">Tests running: %s</string>
+    <string name="connection_running_task_left">Test progress: %s</string>
 
     <string name="import_subscription_success">Subscription imported successfully</string>
     <string name="import_subscription_failure">Import subscription failed</string>
@@ -599,4 +599,5 @@
     <string name="fn22_manual_tag">MANUAL</string>
     <string name="fn21_manual_import">Manual imports</string>
     <string name="fn21_manual_subtitle">Local nodes · no automatic updates</string>
+    <string name="fn23_testing_progress">Testing %1$d%%</string>
 </resources>

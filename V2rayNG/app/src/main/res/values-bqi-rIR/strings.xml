@@ -408,7 +408,7 @@
     <string name="connection_test_error_status_code">کود ختا: #%d</string>
     <string name="connection_connected">منپیز هڌ. سی واجۊری کیلیک کوݩ.</string>
     <string name="connection_not_connected">منپیز نؽڌ</string>
-    <string name="connection_running_task_left">آزمایشا هونی ٱنجوم ابۊن: %s</string>
+    <string name="connection_running_task_left">پیشرفت آزمایش: %s</string>
 
     <string name="import_subscription_success">اشتراک وا مووفقیت و من ٱوورده وابی</string>
     <string name="import_subscription_failure">و من ٱووردن اشتراک مووفق نبی</string>
@@ -598,4 +598,5 @@
     <string name="fn21_manual_subtitle">گره‌های محلی · بدون به‌روزرسانی خودکار</string>
     <string name="fn22_auto_tag">خودکار</string>
     <string name="fn22_manual_tag">دستی</string>
+    <string name="fn23_testing_progress">آزمایش در حال انجام: %1$d%%</string>
 </resources>

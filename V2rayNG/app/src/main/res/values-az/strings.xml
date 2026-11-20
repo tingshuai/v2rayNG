@@ -408,7 +408,7 @@
     <string name="connection_test_error_status_code">Xəta kodu: #%d</string>
     <string name="connection_connected">Qoşuldu. Bağlantını yoxlamaq üçün toxunun.</string>
     <string name="connection_not_connected">Qoşulmayıb</string>
-    <string name="connection_running_task_left">İcra olunan sınaqlar: %s</string>
+    <string name="connection_running_task_left">Sınaq gedişi: %s</string>
 
     <string name="import_subscription_success">Abunəlik uğurla idxal edildi</string>
     <string name="import_subscription_failure">Abunəlik idxalı uğursuz oldu</string>
@@ -599,4 +599,5 @@
     <string name="fn21_manual_subtitle">Yerli qovşaqlar · avtomatik yenilənmir</string>
     <string name="fn22_auto_tag">AVTO</string>
     <string name="fn22_manual_tag">ƏLLƏ</string>
+    <string name="fn23_testing_progress">Sınaq gedir: %1$d%%</string>
 </resources>

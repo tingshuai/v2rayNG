@@ -406,7 +406,7 @@
     <string name="connection_test_error_status_code">錯誤碼：#%d</string>
     <string name="connection_connected">"已連線。輕觸以檢查連線。"</string>
     <string name="connection_not_connected">"未連線"</string>
-    <string name="connection_running_task_left">正在執行的測試：%s</string>
+    <string name="connection_running_task_left">測試進度：%s</string>
 
     <string name="import_subscription_success">匯入訂閱成功</string>
     <string name="import_subscription_failure">匯入訂閱失敗</string>
@@ -596,4 +596,5 @@
     <string name="fn21_manual_subtitle">本機節點 · 不自動更新</string>
     <string name="fn22_auto_tag">訂閱自動</string>
     <string name="fn22_manual_tag">手動節點</string>
+    <string name="fn23_testing_progress">正在測試 %1$d%%</string>
 </resources>

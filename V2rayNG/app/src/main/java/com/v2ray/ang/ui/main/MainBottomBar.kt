@@ -49,18 +49,16 @@ fun MainBottomBar(
 ) {
     val scope = rememberCoroutineScope()
     val rotationAnim = remember { Animatable(0f) }
-    val connectionButtonTone = if (isRunning) LatencyTone.FAST else latencyTone(selectedServerDelayMillis)
-    val connectionButtonColor = when (connectionButtonTone) {
-        LatencyTone.FAST -> MaterialTheme.colorScheme.tertiary
-        LatencyTone.MODERATE -> MaterialTheme.colorScheme.secondary
-        LatencyTone.SLOW, LatencyTone.FAILED -> MaterialTheme.colorScheme.error
-        LatencyTone.UNKNOWN -> MaterialTheme.colorScheme.surfaceContainerHigh
+    val connectionIsHealthy = isRunning || selectedServerDelayMillis > 0L
+    val connectionButtonColor = when {
+        connectionIsHealthy -> MaterialTheme.colorScheme.tertiary
+        selectedServerDelayMillis < 0L -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
-    val connectionButtonContentColor = when (connectionButtonTone) {
-        LatencyTone.FAST -> MaterialTheme.colorScheme.onTertiary
-        LatencyTone.MODERATE -> MaterialTheme.colorScheme.onSecondary
-        LatencyTone.SLOW, LatencyTone.FAILED -> MaterialTheme.colorScheme.onError
-        LatencyTone.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+    val connectionButtonContentColor = when {
+        connectionIsHealthy -> MaterialTheme.colorScheme.onTertiary
+        selectedServerDelayMillis < 0L -> MaterialTheme.colorScheme.onError
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     LaunchedEffect(isRunning) {

@@ -57,4 +57,15 @@ class MainListInteractionTest {
         val success = ConnectionTestResult(42, "", "US", "203.0.113.2")
         assertEquals(MainStatus.ConnectionTest(success), connectionTestStatus(success))
     }
+
+    @Test
+    fun testProgressIsShownAsBoundedPercentage() {
+        assertEquals(0, testProgressPercent("0 / 12"))
+        assertEquals(92, testProgressPercent("11 / 12"))
+        assertEquals(100, testProgressPercent("12/12"))
+        assertEquals(100, testProgressPercent("13/12"))
+        assertEquals(null, testProgressPercent("running"))
+        assertEquals(null, testProgressPercent("3/0"))
+        assertEquals(null, testProgressPercent(null))
+    }
 }

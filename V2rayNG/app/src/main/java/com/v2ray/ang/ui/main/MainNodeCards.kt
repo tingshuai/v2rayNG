@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -127,7 +128,7 @@ internal fun NodeCardsContent(
             SubscriptionInfoCard(info = usageInfo, fallbackTitle = groupTitle, onOpenLink = onOpenLink, onRefresh = onRefresh)
         }
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+            Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -144,13 +145,17 @@ internal fun NodeCardsContent(
             if (isTesting) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Text(testProgress?.let { stringResource(R.string.connection_running_task_left, it) }
-                        ?: stringResource(R.string.connection_test_testing), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        testProgressPercent(testProgress)?.let { stringResource(R.string.fn23_testing_progress, it) }
+                            ?: stringResource(R.string.connection_test_testing),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             } else {
                 TextButton(
                     onClick = onTest,
                     enabled = !isTesting,
+                    modifier = Modifier.height(40.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                 ) {
                     Icon(

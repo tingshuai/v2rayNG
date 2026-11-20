@@ -412,7 +412,7 @@
     <string name="connection_test_error_status_code">Код ошибки: #%d</string>
     <string name="connection_connected">Подключено.\nНажмите, чтобы проверить соединение.</string>
     <string name="connection_not_connected">Нет соединения</string>
-    <string name="connection_running_task_left">Выполняется проверок: %s</string>
+    <string name="connection_running_task_left">Ход проверки: %s</string>
 
     <string name="import_subscription_success">Подписка импортирована</string>
     <string name="import_subscription_failure">Невозможно импортировать подписку</string>
@@ -602,4 +602,5 @@
     <string name="fn21_manual_subtitle">Локальные узлы · без автообновления</string>
     <string name="fn22_auto_tag">АВТО</string>
     <string name="fn22_manual_tag">ВРУЧНУЮ</string>
+    <string name="fn23_testing_progress">Идёт проверка: %1$d%%</string>
 </resources>

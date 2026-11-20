@@ -416,7 +416,7 @@
     <string name="connection_test_error_status_code">رمز الخطأ: #%d</string>
     <string name="connection_connected">متصل. اضغط للتحقق من الاتصال.</string>
     <string name="connection_not_connected">غير متصل</string>
-    <string name="connection_running_task_left">الاختبارات قيد التشغيل: %s</string>
+    <string name="connection_running_task_left">تقدم الاختبار: %s</string>
 
     <string name="import_subscription_success">تم استيراد الاشتراك بنجاح</string>
     <string name="import_subscription_failure">فشل استيراد الاشتراك</string>
@@ -606,4 +606,5 @@
     <string name="fn21_manual_subtitle">عقد محلية · بلا تحديث تلقائي</string>
     <string name="fn22_auto_tag">تلقائي</string>
     <string name="fn22_manual_tag">يدوي</string>
+    <string name="fn23_testing_progress">جارٍ اختبار العقد: %1$d%%</string>
 </resources>

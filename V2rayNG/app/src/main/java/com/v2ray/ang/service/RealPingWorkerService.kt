@@ -23,6 +23,8 @@ import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
+internal fun formatRealPingProgress(completed: Int, total: Int): String = "$completed / $total"
+
 internal object RealPingExecutionLimiter {
     private val customConfigMutex = Mutex()
 
@@ -53,14 +55,12 @@ class RealPingWorkerService(
     private val dispatcher = Executors.newFixedThreadPool(if (onlyTcp) concurrency * 2 else concurrency).asCoroutineDispatcher()
     private val scope = CoroutineScope(job + dispatcher + CoroutineName("RealPingBatchWorker"))
 
-    private val runningCount = AtomicInteger(0)
-    private val totalCount = AtomicInteger(0)
+    private val completedCount = AtomicInteger(0)
 
     fun start() {
+        val totalCount = guids.size
         val jobs = guids.map { guid ->
-            totalCount.incrementAndGet()
             scope.launch {
-                runningCount.incrementAndGet()
                 try {
                     val result = if (onlyTcp) startTcping(guid) else measure(context, guid)
                     if (scope.isActive) {
@@ -69,10 +69,13 @@ class RealPingWorkerService(
                 } catch (_: Throwable) {
                     // ignore
                 } finally {
-                    val count = totalCount.decrementAndGet()
-                    val left = runningCount.decrementAndGet()
                     if (scope.isActive) {
-                        onEvent(RealPingEvent.Progress("$left / $count"))
+                        synchronized(completedCount) {
+                            if (scope.isActive) {
+                                val completed = completedCount.incrementAndGet()
+                                onEvent(RealPingEvent.Progress(formatRealPingProgress(completed, totalCount)))
+                            }
+                        }
                     }
                 }
             }
