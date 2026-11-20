@@ -64,7 +64,22 @@ object LauncherManager {
 
         try {
             startContextService(context)
+            val selectedGuid = MmkvManager.getSelectServer()
+            val selectedProfile = selectedGuid?.let(MmkvManager::decodeServerConfig)
+            LogUtil.diagnostic(
+                "service_start_dispatched",
+                mapOf(
+                    "profile" to LogUtil.diagnosticId(selectedGuid),
+                    "subscription" to LogUtil.diagnosticId(
+                        selectedProfile?.policyGroupSubscriptionId ?: selectedProfile?.subscriptionId
+                    ),
+                ),
+            )
         } catch (e: Exception) {
+            LogUtil.diagnostic(
+                "service_start_failed",
+                mapOf("error" to e.javaClass.simpleName.lowercase().filter { it.isLetterOrDigit() }.ifEmpty { "unknown" }),
+            )
             LogUtil.e(AppConfig.TAG, "LauncherManager: ${e.message}", e)
             context.toast(e.message ?: e.javaClass.simpleName)
         }
@@ -83,6 +98,18 @@ object LauncherManager {
     /** Restarts the active daemon, or delegates to the caller's permission-aware start flow. */
     fun restartServiceOrStart(context: Context, startIfStopped: () -> Unit) {
         MessageHelper.sendMsg2ServiceForResult(context, AppConfig.MSG_STATE_RESTART, "") { handled ->
+            val selectedGuid = MmkvManager.getSelectServer()
+            val selectedProfile = selectedGuid?.let(MmkvManager::decodeServerConfig)
+            LogUtil.diagnostic(
+                "restart_ack",
+                mapOf(
+                    "handled" to handled.toString(),
+                    "profile" to LogUtil.diagnosticId(selectedGuid),
+                    "subscription" to LogUtil.diagnosticId(
+                        selectedProfile?.policyGroupSubscriptionId ?: selectedProfile?.subscriptionId
+                    ),
+                ),
+            )
             if (!handled) startIfStopped()
         }
     }

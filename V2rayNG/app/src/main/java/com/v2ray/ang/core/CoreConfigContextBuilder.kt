@@ -147,10 +147,10 @@ object CoreConfigContextBuilder {
             val serverList = MmkvManager.decodeAllServerList()
             val isFreeNodeGroup = config.policyGroupSubscriptionId == AppConfig.FREE_NODE_SUBSCRIPTION_ID
             val selectableFreeNodeFingerprints = if (isFreeNodeGroup) FreeNodeManager.selectableFingerprints() else emptySet()
-            return serverList
+            val members = serverList
                 .asSequence()
-                .mapNotNull { id -> MmkvManager.decodeServerConfig(id) }
-                .filter { profile ->
+                .mapNotNull { id -> MmkvManager.decodeServerConfig(id)?.let { id to it } }
+                .filter { (_, profile) ->
                     val subscriptionId = config.policyGroupSubscriptionId
                     if (subscriptionId.isNullOrBlank()) {
                         true
@@ -158,7 +158,7 @@ object CoreConfigContextBuilder {
                         profile.subscriptionId == subscriptionId
                     }
                 }
-                .filter { profile ->
+                .filter { (_, profile) ->
                     val filter = config.policyGroupFilter
                     if (filter.isNullOrBlank()) {
                         true
@@ -170,13 +170,29 @@ object CoreConfigContextBuilder {
                         }
                     }
                 }
-                .filter { profile ->
+                .filter { (_, profile) ->
                     !isFreeNodeGroup || FreeNodeManager.fingerprint(profile) in selectableFreeNodeFingerprints
                 }
-                .filter { it.server.isNotNullEmpty() }
-                .filter { Utils.isPureIpAddress(it.server!!) || Utils.isValidUrl(it.server!!) }
-                .filter { !it.configType.isComplexType() }
+                .filter { (_, profile) -> profile.server.isNotNullEmpty() }
+                .filter { (_, profile) -> Utils.isPureIpAddress(profile.server!!) || Utils.isValidUrl(profile.server!!) }
+                .filter { (_, profile) -> !profile.configType.isComplexType() }
                 .toList()
+            LogUtil.diagnostic(
+                "policy_group_members",
+                mapOf(
+                    "subscription" to LogUtil.diagnosticId(config.policyGroupSubscriptionId),
+                    "strategy" to (config.policyGroupType?.takeIf { it.matches(Regex("[A-Za-z0-9._-]{1,40}")) } ?: "default"),
+                    "count" to members.size.toString(),
+                    "member_ids" to members.take(64).joinToString(",") { LogUtil.diagnosticId(it.first) }.ifEmpty { "none" },
+                    "endpoint_ids" to members.take(64).joinToString(",") {
+                        LogUtil.diagnosticId("${it.second.server.orEmpty().lowercase()}:${it.second.serverPort.orEmpty()}")
+                    }.ifEmpty { "none" },
+                    "address_ids" to members.take(64).joinToString(",") {
+                        LogUtil.diagnosticId(it.second.server.orEmpty().lowercase())
+                    }.ifEmpty { "none" },
+                ),
+            )
+            return members.map { it.second }
         } catch (e: Exception) {
             LogUtil.e(AppConfig.TAG, "Failed to resolve policy group profiles for '${config.remarks}'", e)
             return listOf(config)

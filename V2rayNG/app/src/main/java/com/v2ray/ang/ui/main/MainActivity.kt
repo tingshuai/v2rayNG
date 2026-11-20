@@ -118,6 +118,15 @@ class MainActivity : HelperBaseComponentActivity() {
                         val previous = mainViewModel.uiState.value.selectedSubscriptionId
                         mainViewModel.onAction(action)
                         if (previous != action.groupId && mainViewModel.uiState.value.showingSubscriptions) {
+                            LogUtil.diagnostic(
+                                "subscription_selected",
+                                mapOf(
+                                    "previous" to LogUtil.diagnosticId(previous),
+                                    "target" to LogUtil.diagnosticId(action.groupId),
+                                    "profile" to LogUtil.diagnosticId(mainViewModel.uiState.value.selectedGuid),
+                                    "running" to mainViewModel.uiState.value.isRunning.toString(),
+                                ),
+                            )
                             mainViewModel.testCurrentServerAfterServiceStart()
                             LauncherManager.restartServiceOrStart(this, ::requestServiceStart)
                         }
@@ -292,6 +301,16 @@ class MainActivity : HelperBaseComponentActivity() {
         val selected = mainViewModel.uiState.value.selectedGuid
         if (guid != selected) {
             mainViewModel.updateSelectedGuid(guid)
+            val profile = MmkvManager.decodeServerConfig(guid)
+            LogUtil.diagnostic(
+                "node_selected",
+                mapOf(
+                    "previous" to LogUtil.diagnosticId(selected),
+                    "target" to LogUtil.diagnosticId(guid),
+                    "subscription" to LogUtil.diagnosticId(profile?.subscriptionId),
+                    "running" to mainViewModel.uiState.value.isRunning.toString(),
+                ),
+            )
             mainViewModel.testCurrentServerAfterServiceStart()
             LauncherManager.restartServiceOrStart(this, ::requestServiceStart)
         }

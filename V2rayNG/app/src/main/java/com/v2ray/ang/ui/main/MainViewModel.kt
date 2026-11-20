@@ -835,14 +835,38 @@ class MainViewModel(
         val selectedGuid = dataSource.getSelectServer() ?: return
         val selected = dataSource.decodeServerConfig(selectedGuid)
         if (selected == null) {
-            val groupGuid = dataSource.findPolicyGroupGuid(subscriptionId) ?: return
+            val groupGuid = dataSource.findPolicyGroupGuid(subscriptionId)
+            LogUtil.diagnostic(
+                "policy_group_resolution",
+                mapOf(
+                    "subscription" to LogUtil.diagnosticId(subscriptionId),
+                    "current_profile" to LogUtil.diagnosticId(selectedGuid),
+                    "current_subscription" to "none",
+                    "target_group_profile" to LogUtil.diagnosticId(groupGuid),
+                    "found" to (groupGuid != null).toString(),
+                ),
+            )
+            if (groupGuid == null) return
             dataSource.setSelectServer(groupGuid)
             _uiState.update { it.copy(selectedGuid = groupGuid) }
             refreshSelectedServerInfo()
             return
         }
         if (!shouldReplaceConnectionTarget(selected, subscriptionId)) return
-        val groupGuid = dataSource.findPolicyGroupGuid(subscriptionId) ?: return
+        val groupGuid = dataSource.findPolicyGroupGuid(subscriptionId)
+        LogUtil.diagnostic(
+            "policy_group_resolution",
+            mapOf(
+                "subscription" to LogUtil.diagnosticId(subscriptionId),
+                "current_profile" to LogUtil.diagnosticId(selectedGuid),
+                "current_subscription" to LogUtil.diagnosticId(
+                    selected.policyGroupSubscriptionId ?: selected.subscriptionId
+                ),
+                "target_group_profile" to LogUtil.diagnosticId(groupGuid),
+                "found" to (groupGuid != null).toString(),
+            ),
+        )
+        if (groupGuid == null) return
         dataSource.setSelectServer(groupGuid)
         _uiState.update { it.copy(selectedGuid = groupGuid) }
         refreshSelectedServerInfo()

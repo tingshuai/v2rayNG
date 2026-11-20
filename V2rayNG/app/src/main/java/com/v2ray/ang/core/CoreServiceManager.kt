@@ -130,6 +130,16 @@ object CoreServiceManager {
         val guid = MmkvManager.getSelectServer() ?: error("No server selected")
         val config = MmkvManager.decodeServerConfig(guid) ?: error("Failed to decode server config")
 
+        LogUtil.diagnostic(
+            "core_start_requested",
+            mapOf(
+                "profile" to LogUtil.diagnosticId(guid),
+                "subscription" to LogUtil.diagnosticId(config.policyGroupSubscriptionId ?: config.subscriptionId),
+                "type" to config.configType.name.lowercase(),
+                "reload" to isReload.toString(),
+            ),
+        )
+
         LogUtil.i(AppConfig.TAG, "StartCore-Manager: Starting core loop for ${config.remarks}")
         val result = CoreConfigManager.getV2rayConfig(service, guid)
         LogUtil.d(AppConfig.TAG, result.content)
@@ -180,6 +190,15 @@ object CoreServiceManager {
         if (!isReload) {
             MessageHelper.sendMsg2UI(service, AppConfig.MSG_STATE_START_SUCCESS, "")
         }
+        LogUtil.diagnostic(
+            "core_started",
+            mapOf(
+                "profile" to LogUtil.diagnosticId(guid),
+                "subscription" to LogUtil.diagnosticId(config.policyGroupSubscriptionId ?: config.subscriptionId),
+                "type" to config.configType.name.lowercase(),
+                "reload" to isReload.toString(),
+            ),
+        )
         NotificationManager.startSpeedNotification()
         LogUtil.i(AppConfig.TAG, "StartCore-Manager: Core started successfully")
     }
@@ -346,6 +365,28 @@ object CoreServiceManager {
 
             ensureActive()
             val endpoint = if (time >= 0) SpeedtestManager.getRemoteIPInfo() else null
+            val selectedGuid = MmkvManager.getSelectServer()
+            val selectedProfile = selectedGuid?.let(MmkvManager::decodeServerConfig)
+            val selectedGroupId = selectedProfile?.policyGroupSubscriptionId
+            val exitMatchingMemberIds = if (endpoint?.ipAddress != null && !selectedGroupId.isNullOrBlank()) {
+                MmkvManager.decodeServerList(selectedGroupId).mapNotNull { memberGuid ->
+                    val member = MmkvManager.decodeServerConfig(memberGuid)
+                    memberGuid.takeIf { member?.server.equals(endpoint.ipAddress, ignoreCase = true) }
+                }
+            } else emptyList()
+            LogUtil.diagnostic(
+                "connection_check",
+                mapOf(
+                    "profile" to LogUtil.diagnosticId(selectedGuid),
+                    "subscription" to LogUtil.diagnosticId(selectedGroupId ?: selectedProfile?.subscriptionId),
+                    "delay_ms" to time.toString(),
+                    "exit_ip" to (endpoint?.ipAddress?.takeIf { it.matches(Regex("[A-Fa-f0-9:.]{3,45}")) } ?: "unavailable"),
+                    "exit_address_id" to LogUtil.diagnosticId(endpoint?.ipAddress?.lowercase()),
+                    "country" to (endpoint?.country?.takeIf { it.matches(Regex("[A-Za-z-]{2,40}")) } ?: "unknown"),
+                    "exit_matching_member_ids" to exitMatchingMemberIds.take(12)
+                        .joinToString(",") { LogUtil.diagnosticId(it) }.ifEmpty { "none" },
+                ),
+            )
             val result = ConnectionTestResult(
                 delayMillis = time,
                 errorMessage = errorStr,
@@ -483,6 +524,17 @@ object CoreServiceManager {
 
                 AppConfig.MSG_STATE_RESTART -> {
                     LogUtil.i(AppConfig.TAG, "StartCore-Manager: Restart service")
+                    val selectedGuid = MmkvManager.getSelectServer()
+                    val selectedProfile = selectedGuid?.let(MmkvManager::decodeServerConfig)
+                    LogUtil.diagnostic(
+                        "restart_received",
+                        mapOf(
+                            "profile" to LogUtil.diagnosticId(selectedGuid),
+                            "subscription" to LogUtil.diagnosticId(
+                                selectedProfile?.policyGroupSubscriptionId ?: selectedProfile?.subscriptionId
+                            ),
+                        ),
+                    )
                     // The UI and daemon run in separate processes, so acknowledge the active
                     // daemon before stopping it instead of relying on possibly stale UI state.
                     if (isOrderedBroadcast) resultCode = Activity.RESULT_OK
