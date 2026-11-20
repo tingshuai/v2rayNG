@@ -52,14 +52,17 @@ incompatible actions; every other root rule remains active.
 - `AGENTS.md` files are the only rule source. `CLAUDE.md`, `GEMINI.md`, and
   `.github/copilot-instructions.md` are routing shims and must only load or point to applicable
   `AGENTS.md` files.
-- Feature, fix, and release branches use instruction files from fetched `upstream/master` as their
-  baseline. If `upstream` is absent, run
-  `git remote add upstream https://github.com/2dust/v2rayNG.git`; otherwise require
-  `git remote get-url upstream` to print exactly that URL. Successfully run
-  `git fetch upstream master` before comparison. An agent-instruction branch uses its HEAD and
-  working diff as the proposal.
-- At task start and after each upstream merge or rebase, synchronize canonical instructions into
-  the worktree without deleting local-only text. Compare them with:
+- `origin/master` is the default integration target for changes from every branch and worktree.
+  Do not integrate into `upstream/master` or target a PR there unless the user explicitly requests
+  it. Do not merge, rebase, cherry-pick, or otherwise incorporate `upstream/master` updates into
+  `origin/master` during ordinary feature integration. Fetching or comparing upstream is not
+  authorization to bring its commits into this fork; sync upstream only on explicit user request.
+- Preserve the source branch and its commits while integrating into `origin/master`, retaining
+  existing target history and content. Never replace the target with a feature branch or
+  force-push it. Before deleting branches or worktrees, verify unique commits and working-tree
+  changes are preserved in the intended branch and, where appropriate, pushed to `origin`.
+- When an upstream sync is explicitly requested, fetch `upstream/master` and synchronize canonical
+  instructions into the worktree without deleting local-only text. Compare them with:
 
   ```sh
   git diff upstream/master -- ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' ':(glob)**/GEMINI.md' .github/copilot-instructions.md
@@ -72,21 +75,19 @@ incompatible actions; every other root rule remains active.
   visible lines `LOCAL INSTRUCTIONS - START` and `LOCAL INSTRUCTIONS - END`.
   Unless the task targets agent instructions, treat every pre-existing instruction-file difference
   as local-only.
-- Keep local-only text unstaged and uncommitted. Never use `git add .`, `git add -A`, or
-  `git commit -a` in that worktree. Stage task paths explicitly; never delete, restore, or overwrite
-  local instructions to clean the worktree.
-- Before each commit, push, or PR update outside agent-instruction scope, run both commands. Both
-  must print no paths; otherwise stop and remove the instruction change from the staged or branch
-  diff without altering its working copy.
+- Preserve local-only text unless the user asks to update it. Never use `git add .`, `git add -A`,
+  or `git commit -a` in that worktree. Stage task paths explicitly; never delete, restore, or
+  overwrite unrelated local instructions to clean the worktree. User-requested instruction changes
+  are in scope and may be committed with the requested work.
 
   ```sh
   git diff --cached --name-only -- ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' ':(glob)**/GEMINI.md' .github/copilot-instructions.md
   git diff --name-only upstream/master...HEAD -- ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' ':(glob)**/GEMINI.md' .github/copilot-instructions.md
   ```
 
-- Commit instruction files only for a task explicitly limited to agent instructions. The branch
-  and PR may contain only `AGENTS.md` and necessary routing-shim changes; name agent instructions
-  in the PR title and state that exclusive scope in the body.
+- Commit instruction files when the task explicitly requests a rule change, or when they are
+  otherwise necessary to the requested work. A task limited to instruction files should keep its
+  branch and PR limited to `AGENTS.md` and necessary routing-shim changes.
 
 ## Project boundaries
 
@@ -228,11 +229,9 @@ behavior for every user who does not opt in.
   or a decision that requires the user's authority.
 
 - `origin` is `https://github.com/tingshuai/v2rayNG.git`; `upstream` is
-  `https://github.com/2dust/v2rayNG.git`. `upstream/master` is the core baseline. Do not replace,
-  rebase, or force-push `master`; use focused `codex/` branches and explicit merges or PRs.
-- Before an upstream-sync or feature branch, run `git fetch upstream master`, compare the branch
-  with `upstream/master`, and update the canonical instruction files as required by this guide.
-  Keep this local block intact during upstream synchronization.
+  `https://github.com/2dust/v2rayNG.git`. Use `origin/master` as the integration target under the
+  rules above. Do not replace, rebase, or force-push `master`; use focused `codex/` branches and
+  explicit merges or PRs.
 - Keep the collector and screening service operationally and by directory separate from the Android
   client. `V2rayNG/` owns Android integration; `collector/` is an independent Go module that owns
   source registration, bounded screening, and standard-subscription publication. They share only
