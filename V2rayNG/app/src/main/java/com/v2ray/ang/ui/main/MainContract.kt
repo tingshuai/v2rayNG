@@ -39,13 +39,20 @@ data class MainUiState(
 enum class ConnectionSource { SUBSCRIPTION, DIRECT_SERVER }
 
 internal fun MainUiState.withSelectedSubscription(groupId: String): MainUiState =
-    copy(selectedSubscriptionId = groupId, selectedGroupId = groupId, connectionSource = ConnectionSource.SUBSCRIPTION)
+    copy(
+        selectedSubscriptionId = groupId,
+        selectedGroupId = groupId,
+        connectionSource = ConnectionSource.SUBSCRIPTION,
+        selectedServerDelayMillis = 0L,
+        isTesting = true,
+        status = MainStatus.Testing,
+    )
 
 internal fun MainUiState.withOpenedSubscription(groupId: String): MainUiState =
     copy(selectedGroupId = groupId, showingSubscriptions = false, selectedCountryCode = null)
 
 internal fun connectionTestStatus(result: ConnectionTestResult): MainStatus =
-    if (result.delayMillis < 0L) MainStatus.Connected else MainStatus.ConnectionTest(result)
+    MainStatus.ConnectionTest(result)
 
 internal fun testProgressPercent(progress: String?): Int? {
     val parts = progress?.split('/') ?: return null

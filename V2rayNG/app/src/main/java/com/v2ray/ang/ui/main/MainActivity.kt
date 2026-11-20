@@ -106,7 +106,7 @@ class MainActivity : HelperBaseComponentActivity() {
             onAction = { action ->
                 when (action) {
                     MainAction.ToggleService -> handleFabAction()
-                    MainAction.TestCurrentServer -> handleLayoutTestClick()
+                    MainAction.TestCurrentServer -> mainViewModel.testCurrentServerRealPing()
                     MainAction.ImportQRcode -> importQRcode()
                     MainAction.ImportClipboard -> importClipboard()
                     MainAction.ImportConfigLocal -> importConfigLocal()
@@ -114,6 +114,14 @@ class MainActivity : HelperBaseComponentActivity() {
                     MainAction.RestartService -> LauncherManager.restartServiceOrStart(this, ::requestServiceStart)
                     MainAction.LocateSelectedServer -> mainViewModel.triggerLocateSelectedServer()
                     is MainAction.SelectServer -> setSelectServer(action.guid)
+                    is MainAction.SelectGroup -> {
+                        val previous = mainViewModel.uiState.value.selectedSubscriptionId
+                        mainViewModel.onAction(action)
+                        if (previous != action.groupId && mainViewModel.uiState.value.showingSubscriptions) {
+                            mainViewModel.testCurrentServerAfterServiceStart()
+                            LauncherManager.restartServiceOrStart(this, ::requestServiceStart)
+                        }
+                    }
                     is MainAction.EditServer -> editServer(action.guid, action.profile)
                     is MainAction.ShareClipboard -> shareToClipboard(action.guid)
                     is MainAction.ShareFullContent -> shareFullContentAsync(action.guid)
@@ -181,12 +189,6 @@ class MainActivity : HelperBaseComponentActivity() {
         }
         val intent = VpnService.prepare(this)
         if (intent == null) startV2Ray() else requestVpnPermission.launch(intent)
-    }
-
-    private fun handleLayoutTestClick() {
-        if (mainViewModel.uiState.value.isRunning) {
-            mainViewModel.testCurrentServerRealPing()
-        }
     }
 
     private fun startV2Ray() {
@@ -290,7 +292,8 @@ class MainActivity : HelperBaseComponentActivity() {
         val selected = mainViewModel.uiState.value.selectedGuid
         if (guid != selected) {
             mainViewModel.updateSelectedGuid(guid)
-            LauncherManager.restartService(this)
+            mainViewModel.testCurrentServerAfterServiceStart()
+            LauncherManager.restartServiceOrStart(this, ::requestServiceStart)
         }
     }
 

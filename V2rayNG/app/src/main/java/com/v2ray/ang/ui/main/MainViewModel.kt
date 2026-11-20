@@ -145,6 +145,7 @@ class MainViewModel(
 
     private val testRequests = MainTestRequests()
     private var bulkTestJob: Job? = null
+    private var testAfterServiceStart = false
 
     private val initialPageReady = CompletableDeferred<Unit>()
 
@@ -169,9 +170,14 @@ class MainViewModel(
             MainServiceEvent.StateStartSuccess -> {
                 toastSuccess(R.string.toast_services_success)
                 updateRunningState(true)
+                if (testAfterServiceStart) {
+                    testAfterServiceStart = false
+                    testCurrentServerRealPing()
+                }
             }
 
             is MainServiceEvent.StateStartFailure -> {
+                testAfterServiceStart = false
                 if (!event.message.isNullOrBlank()) {
                     toastError(event.message)
                 } else {
@@ -799,6 +805,11 @@ class MainViewModel(
         if (_uiState.value.groups.none { it.id == id }) return
         mutableServerGroupState(id)
         val isSelectingConnectionCollection = uiState.value.showingSubscriptions
+        val connectionTargetChanged = isSelectingConnectionCollection && uiState.value.selectedSubscriptionId != id
+        if (connectionTargetChanged) {
+            cancelAllPing()
+            testRequests.invalidateCurrent()
+        }
         if (uiState.value.selectedGroupId != id || uiState.value.selectedSubscriptionId != id) {
             dataSource.setSelectedSubscriptionId(id)
             _uiState.update { it.withSelectedSubscription(id) }
@@ -807,6 +818,15 @@ class MainViewModel(
         }
         if (isSelectingConnectionCollection) {
             ensurePolicyGroupSelection(id)
+            if (connectionTargetChanged && _uiState.value.selectedGuid != null) {
+                _uiState.update {
+                    it.copy(
+                        selectedServerDelayMillis = 0L,
+                        status = if (it.isRunning) MainStatus.Testing else MainStatus.Disconnected,
+                    )
+                }
+                if (_uiState.value.isRunning) testCurrentServerRealPing()
+            }
         }
         loadSelectedGroup(id)
     }
@@ -888,9 +908,23 @@ class MainViewModel(
     }
 
     fun updateSelectedGuid(guid: String) {
+        if (_uiState.value.selectedGuid == guid) return
+        cancelAllPing()
+        testRequests.invalidateCurrent()
         dataSource.setSelectServer(guid)
-        _uiState.update { it.copy(selectedGuid = guid, connectionSource = ConnectionSource.DIRECT_SERVER) }
+        _uiState.update {
+            it.copy(
+                selectedGuid = guid,
+                connectionSource = ConnectionSource.DIRECT_SERVER,
+                selectedServerDelayMillis = 0L,
+                isTesting = it.isRunning,
+                status = if (it.isRunning) MainStatus.Testing else MainStatus.Disconnected,
+            )
+        }
         refreshSelectedServerInfo()
+        if (_uiState.value.isRunning) {
+            testCurrentServerRealPing()
+        }
         dataSource.decodeServerConfig(guid)?.subscriptionId
             ?.takeIf { it == _uiState.value.selectedGroupId }
             ?.takeIf { it != _uiState.value.selectedSubscriptionId }
@@ -904,6 +938,7 @@ class MainViewModel(
 
     private fun refreshSelectedServerInfo() {
         val guid = _uiState.value.selectedGuid
+        _uiState.update { if (it.selectedGuid == guid) it.copy(selectedServerLabel = null, selectedServerDelayMillis = 0L) else it }
         viewModelScope.launch(ioDispatcher) {
             val profile = guid?.let(dataSource::decodeServerConfig)
             val delay = guid?.let(dataSource::decodeAffiliationInfo)?.testDelayMillis ?: 0L
@@ -1032,10 +1067,16 @@ class MainViewModel(
     }
 
     fun testCurrentServerRealPing() {
-        if (!uiState.value.isRunning) return
+        if (!uiState.value.isRunning || uiState.value.selectedGuid.isNullOrBlank()) return
+        _uiState.update { it.copy(selectedServerDelayMillis = 0L) }
+        testRequests.invalidateCurrent()
         val requestId = testRequests.beginCurrent()
         _uiState.update { it.copy(isTesting = true, status = MainStatus.Testing) }
         dataSource.testCurrentServerRealPing(requestId)
+    }
+
+    fun testCurrentServerAfterServiceStart() {
+        testAfterServiceStart = true
     }
 
     private fun onTestsFinished(requestId: String) {

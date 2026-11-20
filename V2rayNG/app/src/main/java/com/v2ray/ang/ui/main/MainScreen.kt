@@ -168,6 +168,7 @@ fun MainScreen(
                         else -> groups.firstOrNull { it.id == uiState.selectedSubscriptionId }?.remarks.orEmpty()
                     },
                     connectionSource = uiState.connectionSource,
+                    status = uiState.status,
                     isRunning = isRunning,
                     onAction = onAction
                 )

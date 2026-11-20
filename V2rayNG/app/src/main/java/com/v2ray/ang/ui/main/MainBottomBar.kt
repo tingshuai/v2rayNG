@@ -3,6 +3,7 @@ package com.v2ray.ang.ui.main
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,20 +45,27 @@ fun MainBottomBar(
     selectedServerDelayMillis: Long,
     connectionGroupLabel: String,
     connectionSource: ConnectionSource,
+    status: MainStatus,
     isRunning: Boolean,
     onAction: (MainAction) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val rotationAnim = remember { Animatable(0f) }
-    val connectionIsHealthy = isRunning || selectedServerDelayMillis > 0L
+    val connectionIsTesting = isRunning && (status is MainStatus.Testing || status is MainStatus.TestProgress)
+    val connectionIsHealthy = isRunning && !connectionIsTesting && (
+        status is MainStatus.Connected || status is MainStatus.ConnectionTest && status.result.delayMillis >= 0L
+    )
+    val connectionFailed = isRunning && status is MainStatus.ConnectionTest && status.result.delayMillis < 0L
     val connectionButtonColor = when {
+        connectionIsTesting -> MaterialTheme.colorScheme.surfaceContainerHigh
         connectionIsHealthy -> MaterialTheme.colorScheme.tertiary
-        selectedServerDelayMillis < 0L -> MaterialTheme.colorScheme.error
+        connectionFailed -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
     val connectionButtonContentColor = when {
+        connectionIsTesting -> MaterialTheme.colorScheme.onSurfaceVariant
         connectionIsHealthy -> MaterialTheme.colorScheme.onTertiary
-        selectedServerDelayMillis < 0L -> MaterialTheme.colorScheme.onError
+        connectionFailed -> MaterialTheme.colorScheme.onError
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
@@ -79,6 +87,7 @@ fun MainBottomBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 76.dp)
+                    .clickable(enabled = isRunning) { onAction(MainAction.TestCurrentServer) }
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween

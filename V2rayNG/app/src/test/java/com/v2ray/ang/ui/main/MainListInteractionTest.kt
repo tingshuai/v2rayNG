@@ -52,8 +52,8 @@ class MainListInteractionTest {
     }
 
     @Test
-    fun failedDelayCheckDoesNotReplaceConnectedStatusWithFailureMessage() {
-        assertEquals(MainStatus.Connected, connectionTestStatus(ConnectionTestResult(-1, "timeout", null, null)))
+    fun failedDelayCheckIsPreservedAsTheCurrentConnectionResult() {
+        assertEquals(MainStatus.ConnectionTest(ConnectionTestResult(-1, "timeout", null, null)), connectionTestStatus(ConnectionTestResult(-1, "timeout", null, null)))
         val success = ConnectionTestResult(42, "", "US", "203.0.113.2")
         assertEquals(MainStatus.ConnectionTest(success), connectionTestStatus(success))
     }

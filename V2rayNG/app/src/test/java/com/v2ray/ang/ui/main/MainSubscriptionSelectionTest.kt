@@ -10,13 +10,21 @@ import com.v2ray.ang.enums.EConfigType
 class MainSubscriptionSelectionTest {
     @Test
     fun selectingSubscriptionUpdatesTheConnectionTarget() {
-        val initial = MainUiState(selectedSubscriptionId = "first", selectedGroupId = "first")
+        val initial = MainUiState(
+            selectedSubscriptionId = "first",
+            selectedGroupId = "first",
+            selectedServerDelayMillis = 125,
+            status = MainStatus.ConnectionTest(com.v2ray.ang.dto.ConnectionTestResult(125, "", null, null)),
+        )
 
         val selected = initial.withSelectedSubscription("second")
 
         assertEquals("second", selected.selectedSubscriptionId)
         assertEquals("second", selected.selectedGroupId)
         assertTrue(selected.showingSubscriptions)
+        assertEquals(0L, selected.selectedServerDelayMillis)
+        assertEquals(MainStatus.Testing, selected.status)
+        assertTrue(selected.isTesting)
     }
 
     @Test
