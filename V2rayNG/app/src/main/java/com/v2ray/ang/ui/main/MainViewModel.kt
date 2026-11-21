@@ -1094,6 +1094,13 @@ class MainViewModel(
 
     fun testCurrentServerAfterServiceStart() {
         testAfterServiceStart = true
+        _uiState.update {
+            it.copy(
+                isTesting = true,
+                status = MainStatus.Testing,
+                lastConnectionTest = null,
+            )
+        }
     }
 
     private fun onTestsFinished(requestId: String) {

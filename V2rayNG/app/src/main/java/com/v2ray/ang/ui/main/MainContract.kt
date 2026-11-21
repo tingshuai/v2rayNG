@@ -55,6 +55,12 @@ internal fun MainUiState.withOpenedSubscription(groupId: String): MainUiState =
 internal fun connectionTestStatus(result: ConnectionTestResult): MainStatus =
     MainStatus.ConnectionTest(result)
 
+internal fun mainBottomStatusText(
+    status: MainStatus,
+    displayText: String,
+    connectionTestLabel: String?,
+): String = if (status is MainStatus.Testing) displayText else connectionTestLabel ?: displayText
+
 internal fun testProgressPercent(progress: String?): Int? {
     val parts = progress?.split('/') ?: return null
     if (parts.size != 2) return null

@@ -36,7 +36,7 @@ fun MainScreen(
     val isLoading by mainViewModel.isLoading.collectAsStateWithLifecycle()
     val isRunning = uiState.isRunning
     val displayText = mainViewModel.formatStatus(uiState.status)
-    val bottomDisplayText = if (!uiState.showingSubscriptions && uiState.isTesting) {
+    val bottomDisplayText = if (!uiState.showingSubscriptions && uiState.status is MainStatus.TestProgress) {
         mainViewModel.formatStatus(if (isRunning) MainStatus.Connected else MainStatus.Disconnected)
     } else displayText
     val displayLastConnectionTest = uiState.lastConnectionTest
